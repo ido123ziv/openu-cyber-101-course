@@ -1,21 +1,8 @@
 import time
 import threading
-PORT_FILE="port.info"
+from shared_server import *
 CLIENT_FILE="clients.info"
 SERVERS_FILE="servers.info"
-
-
-def get_port():
-    try:
-        with open(PORT_FILE,'r') as portfile:
-            port = portfile.readline().strip()
-            if port:
-                return port
-    except Exception as e:
-        print(str(e))
-        print("Going back to default port: 1256")
-    finally:
-        return 1256
 
 
 class KerberosAuthServer:
