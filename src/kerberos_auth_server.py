@@ -18,7 +18,7 @@ def get_port():
         return 1256
 
 
-class KerberosServer:
+class KerberosAuthServer:
     def __init__(self, port: int, clients: list):
         self.clients = clients
         self.port = port
@@ -27,8 +27,10 @@ class KerberosServer:
 
     def generate_session_key(self):
         pass
+
     def get_servers(self):
         pass
+
     def receive_client_request(self):
         pass
 
@@ -59,7 +61,7 @@ def load_clients():
 def main():
     clients = load_clients()
     port = get_port()
-    server = KerberosServer(port, clients)
+    server = KerberosAuthServer(port, clients)
     server.start_server()
 
 
