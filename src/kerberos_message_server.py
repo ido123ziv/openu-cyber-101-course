@@ -19,29 +19,29 @@ def message_keys(key: int):
     return switcher.get(key, -1)
 
 
-def read_server():
-    try:
-        with open(SERVER_FILE, 'r') as server_file:
-            data = server_file.readlines()
-            server_data = {"port": get_port()}
-            for i in range(len(data)):
-                data_key = message_keys(i)
-                if i != -1:
-                    server_data[data_key] = data[i]
-                else:
-                    raise Exception("Corrupted message file")
-            return server_data
-    except Exception as e:
-        print(str(e))
-        print("Going back to default port: 1256")
-        default_error()
+# def read_server():
+#     try:
+#         with open(SERVER_FILE, 'r') as server_file:
+#             data = server_file.readlines()
+#             server_data = {"port": get_port()}
+#             for i in range(len(data)):
+#                 data_key = message_keys(i)
+#                 if i != -1:
+#                     server_data[data_key] = data[i]
+#                 else:
+#                     raise Exception("Corrupted message file")
+#             return server_data
+#     except Exception as e:
+#         print(str(e))
+#         print("Going back to default port: 1256")
+#         default_error()
 
 
 class KerberosMessageServer:
     # def __init__(self, port: int, name: str, uuid: str, key):
     def __init__(self):
         try:
-            server = read_server()
+            server = get_message_servers()
             self.port = server["port"]
             self.name = server["name"]
             self.uuid = server["uuid"]

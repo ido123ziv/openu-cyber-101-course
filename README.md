@@ -27,8 +27,9 @@ OpenU course [20940](https://www.openu.ac.il/courses/20940.htm) final project, k
 1. `port.info` ->  saves the port number (example: 1234)
 2. `clients.info` -> clients data file with structure: `ID:Name:PasswordHash:LastSeen:`
 3. `servers.info` -> servers data file with structure: `ID:Name:AESKey:`
-4. `me.info` -> client data, see below for more details
-5. `msg.info` -> messaging server data, see below
+4. `me.info` -> client data, see [below](#client-data) for more details
+5. `msg.info` -> messaging server data, see [below](#messaging-data)
+6. `srv.info` -> servers addresses and ports
 
 
 #### client data
