@@ -90,6 +90,8 @@ def add_client_to_file(clients):
         print("Couldn't add client, defaulting to previous state")
         with open(CLIENT_FILE, 'w') as clients_file:
             clients_file.writelines(backup_client)
+
+
 def main():
     server = KerberosAuthServer()
     server.start_server()
