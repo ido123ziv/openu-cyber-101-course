@@ -31,6 +31,15 @@ class KerberosAuthServer:
         pass
 
     def receive_client_request(self, request={}):
+        # temp
+        return {
+            "client_id": "alice",
+            "timestamp": "2024-01-14T12:00:00",
+            "nonce": "12345",
+            "encrypted_ticket": "encrypted_ticket_data",
+        }
+
+    def handle_client_request(self, request):
         # TODO add a check if client exists, if so return error
         if not request:
             return "Error"
@@ -47,14 +56,12 @@ class KerberosAuthServer:
                         "LastSeen": time.localtime()
                     })
                 )
+                add_client_to_file(self.clients)
 
         except Exception as e:
             print(str(e))
             return "Error"
         pass
-
-    # might be unused
-    def handle_client_request(self, request):
         pass
 
     def start_server(self):
