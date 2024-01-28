@@ -4,6 +4,10 @@ PROTOCOL_VERSION = 24
 
 
 def get_port():
+    """
+    gets the port to use from file
+    :return: port number
+    """
     try:
         with open(PORT_FILE, 'r') as portfile:
             port = portfile.readline().strip()
@@ -19,6 +23,11 @@ def get_port():
 # get_message_server_details. defaults to read but can write to it
 # TODO add options to write to this file, create a new one maybe
 def get_message_servers(write=False):
+    """
+    gets message server info from file
+    :param write: whether to append data or read data
+    :return: dict of info about message server
+    """
     msg_srv = {}
     flag = 'r'
     if write:
@@ -39,10 +48,17 @@ def get_message_servers(write=False):
 
 
 def get_version():
+    """
+    :return: kerberos protocol version
+    """
     return PROTOCOL_VERSION
 
 
 def default_msg_server():
+    """
+    default message server info
+    :return: a dict with info
+    """
     return {
         "ip": "127.0.0.1",
         "port": 1235,

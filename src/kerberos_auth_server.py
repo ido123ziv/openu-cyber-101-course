@@ -12,17 +12,29 @@ SERVERS_FILE = "servers.info"
 
 
 def create_uuid():
+    """creates uuid for each request, represent a client"""
     return uuid1().int
 
 
 def create_password_sha(password: str):
+    """
+    creates a sha256 from a given password
+    :param password: string representing a password
+    :return: a sha256 of the password
+    """
     sh = SHA256.new()
     sh.update(bytes(password, encoding='utf-8'))
     return sh.hexdigest()
 
 
 class KerberosAuthServer:
+    """
+    This class represents an auth server used by the kerberos protocol and handles all the commands
+    """
     def __init__(self):
+        """
+        creates an object
+        """
         self._clients = load_clients()
         self._port = get_port()
         self._version = get_version()
@@ -32,22 +44,42 @@ class KerberosAuthServer:
 
     @property
     def clients(self):
+        """
+        getter for clients list
+        :return: a list of clients
+        """
         return self._clients
 
     @property
     def port(self):
+        """
+        getter for port property 
+        :return: the port number
+        """
         return self._port
 
     @property
     def version(self):
+        """
+        getter for version property 
+        :return: the server version
+        """
         return self._version
 
     @property
     def servers(self):
+        """
+        getter for servers property 
+        :return: a list of message servers
+        """
         return self._servers
 
     @property
     def message_sever(self):
+        """
+        getter for message_sever property 
+        :return: dict of current message server info
+        """
         return self._message_sever
 
 
@@ -63,6 +95,11 @@ class KerberosAuthServer:
         pass
 
     def receive_client_request(self, request={}):
+        """
+        recieve request from client and parse it
+        :param request: a dict of info
+        :return: parsed dict with the request
+        """
         # temp
         return {
             "Name": "alice",
@@ -71,6 +108,11 @@ class KerberosAuthServer:
         }
 
     def handle_client_request(self, request):
+        """
+        handles the request from the client
+        :param request: parsed dict of info
+        :return: error code
+        """
         # TODO add a check if client exists, if so return error
         if not request:
             return "Error"
@@ -95,6 +137,10 @@ class KerberosAuthServer:
             exit(1)
 
     def start_server(self):
+        """
+        infinite loop of listening server
+        :return:
+        """
         print(f"Server Started on port {self.port}")
         client_request = self.receive_client_request()
         if client_request:
@@ -110,6 +156,10 @@ class KerberosAuthServer:
 
 
 def load_clients():
+    """
+    Loads client from file
+    :return: a list of give clients
+    """
     try:
         with open(CLIENT_FILE, 'r') as clients_file:
             clients = clients_file.readlines()
@@ -118,19 +168,19 @@ def load_clients():
     except Exception as e:
         print(str(e))
         print("No clients found")
-    finally:
         return []
 
 
 def add_client_to_file(clients):
+    """
+    writes client list to file
+    :param clients: current client list
+    """
     backup_client = load_clients()
     try:
         with open(CLIENT_FILE, 'w+') as clients_file:
             for client in clients:
-                clients_file.write("ID: {} ".format(client["ID"]))
-                clients_file.write("Name: {} ".format(client["Name"]))
-                clients_file.write("PasswordHash: {} ".format(client["PasswordHash"]))
-                clients_file.write("LastSeen: {}".format(client["LastSeen"]))
+                clients_file.write(client + "\n")
     except Exception as e:
         print(str(e))
         print("Couldn't add client, defaulting to previous state")
@@ -139,6 +189,9 @@ def add_client_to_file(clients):
 
 
 def main():
+    """
+    main function
+    """
     server = KerberosAuthServer()
     print(f"I'm a Kerberos Server!")
     print(f"my clients are: {server.clients}")
