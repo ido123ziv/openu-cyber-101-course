@@ -1,8 +1,10 @@
 import json
+import random
 from datetime import datetime
 # import threading
 from shared_server import *
 import base64
+from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Hash import SHA256
 from uuid import uuid1
@@ -10,6 +12,23 @@ from uuid import uuid1
 CLIENT_FILE = "clients.info"
 # todo use multiple message services for now leave it
 SERVERS_FILE = "servers.info"
+
+
+def get_name_and_password():
+    key = random.randrange(0, 10)
+    switcher = {
+        0: {"Name": "alice", "Password": "Ab123456!"},
+        1: {"Name": "bob", "Password": "Bc123456!"},
+        2: {"Name": "charile", "Password": "Cd123456!"},
+        3: {"Name": "david", "Password": "De123456!"},
+        4: {"Name": "ego", "Password": "Ef123456!"},
+        5: {"Name": "foxi", "Password": "Fg123456!"},
+        6: {"Name": "grant", "Password": "Gh123456!"},
+        7: {"Name": "homer", "Password": "Hi123456!"},
+        8: {"Name": "ivan", "Password": "Ij123456!"},
+        9: {"Name": "jake", "Password": "Jk123456!"}
+    }
+    return switcher.get(key)
 
 
 def create_uuid():
@@ -95,31 +114,14 @@ class KerberosAuthServer:
     def get_servers(self):
         pass
 
-    def receive_client_request(self, request={}):
+    def register(self, request):
         """
-        recieve request from client and parse it
-        :param request: a dict of info
-        :return: parsed dict with the request
+        These methods handle the registration of a client to the server
+        :return: if the register succeeded
         """
-        # temp
-        return {
-            "Name": "alice",
-            "Password": "Aa132465!",
-            "encrypted_ticket": "encrypted_ticket_data",
-        }
-
-    def handle_client_request(self, request):
-        """
-        handles the request from the client
-        :param request: parsed dict of info
-        :return: error code
-        """
-        # TODO add a check if client exists, if so return error
-        if not request:
-            return "Error"
         try:
             if request["Name"] in self.get_clients_names():
-                return "Error"
+                return "Error, Name already exists!"
             else:
                 client_id = create_uuid()
                 password_hash = create_password_sha(request["Password"])
@@ -132,7 +134,42 @@ class KerberosAuthServer:
                     }
                 )
                 add_client_to_file(self.clients)
+                return "Success!"
+        except Exception as e:
+            print(str(e))
+            return "Error! can't add user because of {}".format(str(e))
 
+    def receive_client_request(self, request={}):
+        """
+        recieve request from client and parse it
+        :param request: a dict of info
+        :return: parsed dict with the request
+        """
+        # temp
+        client = get_name_and_password()
+        print(client)
+        return client
+        # return {
+        #     "Name": "alice",
+        #     "Password": "Aa132465!",
+        #     "encrypted_ticket": "encrypted_ticket_data",
+        # }
+
+    def handle_client_request(self, request):
+        """
+        handles the request from the client
+        :param request: parsed dict of info
+        :return: error code
+        """
+        # TODO: check if payload size matches the payload size header
+        # TODO: check if version matches
+        try:
+            if not request:
+                raise NameError("request is empty!")
+            code = request["Header"]["Code"]
+            if code == 1024:
+                return self.register(request["Payload"])
+            return "Not supported yet!"
         except Exception as e:
             print(str(e))
             exit(1)
@@ -143,9 +180,18 @@ class KerberosAuthServer:
         :return:
         """
         print(f"Server Started on port {self.port}")
-        client_request = self.receive_client_request()
-        if client_request:
-            self.handle_client_request(client_request)
+        # client_request = self.receive_client_request()
+        client_name_for_request = self.receive_client_request()
+        if client_name_for_request:
+            client_request = {
+                "Header": {
+                    "Code": 1024, # register code
+                    "Version": 24
+                },
+                "Payload": client_name_for_request
+            }
+            response = self.handle_client_request(client_request)
+            print(f"Server reply: {response}")
 
         # while True:
         #     client_request = self.receive_client_request()

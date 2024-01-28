@@ -5,6 +5,7 @@ from src.shared_server import *
 import os
 os.chdir("../src")
 
+
 @pytest.fixture
 def server():
     return KerberosAuthServer()
@@ -27,3 +28,12 @@ def test_clients(server):
     with open(CLIENT_FILE, 'r') as clinets_file:
         clients = clinets_file.readlines()
     assert len(server.clients) == len(clients)
+
+
+# test needed:
+"""
+register a client
+terminate server and see if clients are reserved
+generate a key
+client that is already registered can't re-register
+"""
