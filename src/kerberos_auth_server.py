@@ -9,12 +9,33 @@ SERVERS_FILE = "servers.info"
 
 class KerberosAuthServer:
     def __init__(self):
-        self.clients = load_clients()
-        self.port = get_port()
-        self.version = get_version()
-        self.message_sever = get_message_servers()
-        self.servers = {}
+        self._clients = load_clients()
+        self._port = get_port()
+        self._version = get_version()
+        self._message_sever = get_message_servers()
+        self._servers = {}
         # self.lock = threading.Lock()
+
+    @property
+    def clients(self):
+        return self._clients
+
+    @property
+    def port(self):
+        return self._port
+
+    @property
+    def version(self):
+        return self._version
+
+    @property
+    def servers(self):
+        return self._servers
+
+    @property
+    def message_sever(self):
+        return self._message_sever
+
 
     # TODO add a parsing to the client names
     def get_clients_names(self):
@@ -65,10 +86,11 @@ class KerberosAuthServer:
         pass
 
     def start_server(self):
-        while True:
-            client_request = self.receive_client_request()
-            if client_request:
-                pass
+        print(f"Server Started on port {self.port}")
+        # while True:
+        #     client_request = self.receive_client_request()
+        #     if client_request:
+        #         pass
                 # TODO add support for multi servers using threads
                 # thread = threading.Thread(target=self.handle_client_request, args=(client_request,))
                 # thread.start()
@@ -101,6 +123,12 @@ def add_client_to_file(clients):
 
 def main():
     server = KerberosAuthServer()
+    print(f"I'm a Kerberos Server!")
+    print(f"my clients are: {server.clients}")
+    print(f"using port: {server.port}")
+    print(f"my version is {server.version}")
+    print(f"message_sever in use: {server.message_sever}")
+    print(f"my messaging servers {server.servers}")
     server.start_server()
 
 
