@@ -1,10 +1,24 @@
 import json
-import time
+from datetime import datetime
 # import threading
 from shared_server import *
+import base64
+from Crypto.Random import get_random_bytes
+from Crypto.Hash import SHA256
+from uuid import uuid1
 CLIENT_FILE = "clients.info"
 # todo use multiple message services for now leave it
 SERVERS_FILE = "servers.info"
+
+
+def create_uuid():
+    return uuid1().int
+
+
+def create_password_sha(password: str):
+    sh = SHA256.new()
+    sh.update(bytes(password, encoding='utf-8'))
+    return sh.hexdigest()
 
 
 class KerberosAuthServer:
@@ -48,15 +62,11 @@ class KerberosAuthServer:
     def get_servers(self):
         pass
 
-    def create_uuid(self):
-        pass
-
     def receive_client_request(self, request={}):
         # temp
         return {
-            "client_id": "alice",
-            "timestamp": "2024-01-14T12:00:00",
-            "nonce": "12345",
+            "Name": "alice",
+            "Password": "Aa132465!",
             "encrypted_ticket": "encrypted_ticket_data",
         }
 
@@ -68,25 +78,28 @@ class KerberosAuthServer:
             if request["Name"] in self.get_clients_names():
                 return "Error"
             else:
-                client_id = self.create_uuid()
+                client_id = create_uuid()
+                password_hash = create_password_sha(request["Password"])
                 self.clients.append(
-                    json.dumps({
-                        "ID": client_id,
+                    {
+                        "ID": str(client_id),
                         "Name": request["Name"],
-                        "PasswordHash": request["PasswordHash"],
-                        "LastSeen": time.localtime()
-                    })
+                        "PasswordHash": str(password_hash),
+                        "LastSeen": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }
                 )
                 add_client_to_file(self.clients)
 
         except Exception as e:
             print(str(e))
-            return "Error"
-        pass
-        pass
+            exit(1)
 
     def start_server(self):
         print(f"Server Started on port {self.port}")
+        client_request = self.receive_client_request()
+        if client_request:
+            self.handle_client_request(client_request)
+
         # while True:
         #     client_request = self.receive_client_request()
         #     if client_request:
@@ -113,7 +126,11 @@ def add_client_to_file(clients):
     backup_client = load_clients()
     try:
         with open(CLIENT_FILE, 'w+') as clients_file:
-            clients_file.writelines(clients)
+            for client in clients:
+                clients_file.write("ID: {} ".format(client["ID"]))
+                clients_file.write("Name: {} ".format(client["Name"]))
+                clients_file.write("PasswordHash: {} ".format(client["PasswordHash"]))
+                clients_file.write("LastSeen: {}".format(client["LastSeen"]))
     except Exception as e:
         print(str(e))
         print("Couldn't add client, defaulting to previous state")
