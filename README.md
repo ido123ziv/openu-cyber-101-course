@@ -21,7 +21,7 @@ OpenU course [20940](https://www.openu.ac.il/courses/20940.htm) final project, k
 - `Client -->Msg Server: Ticket, Authenticator`
 - `Msg Server -->Client: KeyAck`
 - `Client --> Msg Server: EKc,s(Message)`
-- `Msg Server -->Client: MsgAck`
+- `Msg Server -->Client: MsgAck.`
 
 # Files explained
 1. `port.info` ->  saves the port number (example: 1234)
