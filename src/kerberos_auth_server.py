@@ -105,10 +105,39 @@ class KerberosAuthServer:
 
     # TODO add a parsing to the client names
     def get_clients_names(self):
-        return []
+        return [x["Name"] for x in self.clients]
 
-    def generate_session_key(self):
-        pass
+    # TODO: check if needed
+    def generate_salt(self):
+        """
+        :return: salt ?
+        """
+        return get_random_bytes(16)
+
+    def generate_session_key(self, client_id):
+        """
+
+        :param client_id:
+        :return:
+        """
+        clients_ids = [x["ID"] for x in self.clients]
+        client_index = clients_ids.index(client_id)
+        client = self.clients[client_index]
+        cipher = AES.new(client.get("PasswordHash"), AES.MODE_CBC)
+        ticket = self.generate_ticket(client_id, self.message_sever.get("uuid"), cipher)
+        return cipher, ticket
+
+    def generate_ticket(self, client_id, service_id, key):
+        """
+
+        :param key:
+        :param client_id:
+        :param service_id:
+        :return:
+        """
+        # ticket = f"{client_id}:{service_id}:{base64.b64encode(self.generate_salt()).decode()}"
+        ticket = f"{client_id}:{service_id}:{base64.b64encode(key).decode()}"
+        return ticket
 
     # TODO add support for multi servers using threads
     def get_servers(self):
