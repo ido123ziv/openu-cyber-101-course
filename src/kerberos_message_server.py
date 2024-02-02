@@ -56,14 +56,13 @@ class KerberosMessageServer:
         """
         constructor
         """
-        self._key = None
         try:
             server = get_message_servers()
             self._port = server["port"]
             self._name = server["name"]
             self._uuid = server["uuid"]
-            base64.decode(server["key"], self._key)
             self._version = get_version()
+            self._key = base64.b64decode(server["key"])
             self._lock = threading.Lock()
             self._clients = {}
         except Exception as e:
@@ -232,3 +231,9 @@ def main():
     print(f"my uuid is {server.uuid}")
     print(f"my key is {server.key}")
     server.start_server()
+
+
+if __name__ == "__main__":
+    print("Hello World")
+    main()
+
