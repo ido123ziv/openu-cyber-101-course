@@ -181,11 +181,14 @@ class KerberosAuthServer:
         key = client.get("PasswordHash")
         bytes_key = str(key).encode()[32:]
         print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
-        aes_key = AES.new(bytes_key, AES.MODE_CBC, iv=nonce)
-        ticket_aes_key = self.encrypt_aes(aes_key, nonce, key)
+        aes_key = AES.new(bytes_key, AES.MODE_CBC, iv=create_iv())
+        ticket_aes_key = encrypt_aes(aes_key, nonce, bytes_key)
         # aes_key = AES.new(get_random_bytes(32), AES.MODE_CBC, iv=get_random_bytes(16))
         ticket_payload = self.generate_ticket(client_id, server_id, ticket_aes_key)
-        return aes_key, self.encrypt_aes(aes_key, ticket_payload, nonce)
+        return {
+            "key": aes_key,
+            "ticket": encrypt_aes(aes_key, nonce, ticket_payload.encode())
+        }
 
     def generate_ticket(self, client_id, server_id, key):
         """
@@ -200,6 +203,7 @@ class KerberosAuthServer:
         # ticket = f"{client_id}:{service_id}:{base64.b64encode(self.generate_salt()).decode()}"
         ticket = f"{self.version}:{client_id}:{server_id}"
         ticket += f"{creation_time}:{base64.b64encode(key).decode()}:{expiration_time}"
+        # TODO: encrypt the expiration time
         return ticket
 
     # TODO add support for multi servers using threads
@@ -274,18 +278,22 @@ class KerberosAuthServer:
                 response = self.generate_session_key(client_id,
                                                      self.message_sever.get("uuid"), nonce)
                 print("Created session key!")
-                print(json.dumps(dict(response)))
+                # try:
+                #     print(json.dumps(dict(response)))
+                # except ValueError as e:
+                print(response)
                 # TODO: check the encrypted key iv thing
                 encrypted_key = {
-                    "AES Key": self.encrypt_aes(response[0], nonce, response[0]),
-                    "Nonce": self.encrypt_aes(response[0], nonce, nonce),
+                    "AES Key": encrypt_aes(response.get('key'), nonce, nonce),
+                    "Nonce": encrypt_aes(response.get('key'), nonce, nonce),
                     "Encrypted Key IV": ""
                 }
                 payload = {
                     "encrypted_key": encrypted_key,
-                    "ticket": response[1]
+                    "ticket": response.get('ticket')
                 }
-                print(f"Payload: \n{json.dumps(payload)}")
+                # print(f"Payload: \n{json.dumps(payload)}")
+                print(f"Payload: \n{payload}")
                 return {
                     "Header": {
                         "Code": 1603,
@@ -337,7 +345,7 @@ class KerberosAuthServer:
             },
             "Payload": {
                 "server_id": self.message_sever.get("uuid"),
-                "nonce": get_random_bytes(16)
+                "nonce": create_nonce()
             }
         }
         client_request["Header"]["Payload Size"] = len(client_request["Payload"])
