@@ -5,11 +5,19 @@ SERVER_FILE = "msg.info"
 
 
 def default_error():
+    """
+    :return: default error code
+    """
     print("server responded with an error")
     exit(1)
 
 
 def message_keys(key: int):
+    """
+    helper to get info from message server, no need when using single server
+    :param key: int -> key in dict
+    :return: string name of the key
+    """
     switcher = {
         0: "port",
         1: "name",
@@ -38,6 +46,9 @@ def message_keys(key: int):
 
 
 class KerberosMessageServer:
+    """
+    represents a kerberos message server
+    """
     # def __init__(self, port: int, name: str, uuid: str, key):
     def __init__(self):
         try:
@@ -63,6 +74,10 @@ class KerberosMessageServer:
         pass
 
     def start_server(self):
+        """
+        infinite loop, listening to requests from clients
+        :return:
+        """
         while True:
             client_request = self.receive_client_request()
             if client_request:

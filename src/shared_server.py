@@ -1,3 +1,9 @@
+from Crypto.Hash import SHA256
+from Crypto.Util.Padding import pad, unpad
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+import base64
+
 PORT_FILE = "port.info"
 MESSAGE_SERVER_FILE = "msg.info"
 PROTOCOL_VERSION = 24
@@ -50,3 +56,50 @@ def default_msg_server():
         "uuid": "64f3f63985f04beb81a0e43321880182",
         "key": "MIGdMA0GCSqGSIb3DQEBA"
     }
+
+
+def create_password_sha(password: str):
+    """
+    creates a sha256 from a given password
+    :param password: string representing a password
+    :return: a sha256 of the password
+    """
+    sh = SHA256.new()
+    sh.update(bytes(password, encoding='utf-8'))
+    return sh.hexdigest()
+
+
+def encrypt_aes(aes_key, nonce, data):
+        """
+        encrypts a given data using aes key and nonce.
+        :param aes_key: AES Symmetric Key in used.
+        :param data: data to encrypt.
+        :param nonce: random value created by the client.
+        :return: encrypted data as bytes object.
+        """
+        ciphertext = aes_key.encrypt(pad(data, AES.block_size))
+        return base64.b64encode(nonce + ciphertext)
+
+
+def decrypt_aes(encrypted_data, key):
+    """
+    decrypts a given encrypted data using aes key.
+    :param encrypted_data: data to decript. 
+    :param key: AES Symmetric Key in used.
+    :return: decrypted data as byte string.
+    """
+    data = base64.b64decode(encrypted_data)
+    iv, ciphertext = data[:16], data[16:]
+    cipher = AES.new(key, iv, AES.MODE_CBC)
+    decrypted_data = unpad(cipher.decrypt(ciphertext), AES.block_size)
+    return decrypted_data
+
+
+def create_nonce():
+    """returns random 8 bytes value as nonce."""
+    return get_random_bytes(8)
+
+
+def create_iv():
+    """returns random 16 bytes value as IV."""
+    return get_random_bytes(16)
