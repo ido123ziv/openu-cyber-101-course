@@ -1,0 +1,8 @@
+[flake8]
+exclude =
+    migrations
+    old-deprecated
+    __pycache__
+    src/kerberos_client.py
+    env
+    .env
