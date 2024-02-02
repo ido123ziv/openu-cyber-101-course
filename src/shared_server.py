@@ -1,3 +1,6 @@
+import string
+import random
+
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Cipher import AES
@@ -103,3 +106,10 @@ def create_nonce():
 def create_iv():
     """returns random 16 bytes value as IV."""
     return get_random_bytes(16)
+
+
+def name_generator():
+    name = ''.join(random.choices(string.ascii_lowercase, k=random.randint(3, 5)))
+    password = name[0].upper() + name[0].lower() + "123456!"
+    return {"Name": name, "Password": password}
+

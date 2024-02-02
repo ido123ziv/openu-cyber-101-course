@@ -1,82 +1,19 @@
 import json
-import random
 from datetime import datetime, timedelta
-
-from Crypto.Util.Padding import pad, unpad
 
 # import threading
 from shared_server import *
 import base64
 from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
-from Crypto.Hash import SHA256
 from uuid import uuid1
-import string
 CLIENT_FILE = "clients.info"
 # todo use multiple message services for now leave it
 SERVERS_FILE = "servers.info"
 
 
-def name_generator():
-    orig = 'klmnopqrstuvwxyza'
-    for let in orig:
-        ind = orig.index(let)
-        suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
-        try:
-            print(f"{ind + 10}: " + "{\"Name\": \"" + let + f"{suffix}\", \"Password\": \"" + orig[ind].upper() + orig[
-                ind + 1] + "123456!\"},")
-        except Exception as e:
-            print("26: {Name\": \"zina\", \"Password\": \"Za123456!}")
-
-
-def get_name_and_password():
-    key = random.randrange(0, 26)
-    switcher = {
-        0: {"Name": "alice", "Password": "Ab123456!"},
-        1: {"Name": "bob", "Password": "Bc123456!"},
-        2: {"Name": "charile", "Password": "Cd123456!"},
-        3: {"Name": "david", "Password": "De123456!"},
-        4: {"Name": "ego", "Password": "Ef123456!"},
-        5: {"Name": "foxi", "Password": "Fg123456!"},
-        6: {"Name": "grant", "Password": "Gh123456!"},
-        7: {"Name": "homer", "Password": "Hi123456!"},
-        8: {"Name": "ivan", "Password": "Ij123456!"},
-        9: {"Name": "jake", "Password": "Jk123456!"},
-        10: {"Name": "kI29", "Password": "Kl123456!"},
-        11: {"Name": "lDVP", "Password": "Lm123456!"},
-        12: {"Name": "mV0B", "Password": "Mn123456!"},
-        13: {"Name": "n2PK", "Password": "No123456!"},
-        14: {"Name": "oP0K", "Password": "Op123456!"},
-        15: {"Name": "pCUX", "Password": "Pq123456!"},
-        16: {"Name": "qO3V", "Password": "Qr123456!"},
-        17: {"Name": "r4LO", "Password": "Rs123456!"},
-        18: {"Name": "s27Q", "Password": "St123456!"},
-        19: {"Name": "tLJG", "Password": "Tu123456!"},
-        20: {"Name": "uVJO", "Password": "Uv123456!"},
-        21: {"Name": "vAO2", "Password": "Vw123456!"},
-        22: {"Name": "wT49", "Password": "Wx123456!"},
-        23: {"Name": "x2Q2", "Password": "Xy123456!"},
-        24: {"Name": "yURB", "Password": "Yz123456!"},
-        25: {"Name": "z8SE", "Password": "Za123456!"},
-        26: {"Name": "zina", "Password": "Za123456!"}
-    }
-    return switcher.get(key)
-
-
 def create_uuid():
     """creates uuid for each request, represent a client"""
     return uuid1().int
-
-
-def create_password_sha(password: str):
-    """
-    creates a sha256 from a given password
-    :param password: string representing a password
-    :return: a sha256 of the password
-    """
-    sh = SHA256.new()
-    sh.update(bytes(password, encoding='utf-8'))
-    return sh.hexdigest()
 
 
 class KerberosAuthServer:
@@ -129,7 +66,7 @@ class KerberosAuthServer:
         return self._servers
 
     @property
-    def message_sever(self):
+    def message_sevrer(self):
         """
         getter for message_sever property 
         :return: dict of current message server info
@@ -177,8 +114,8 @@ class KerberosAuthServer:
         creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
         # ticket = f"{client_id}:{service_id}:{base64.b64encode(self.generate_salt()).decode()}"
-        ticket = f"{self.version}:{client_id}:{server_id}"
-        ticket += f"{creation_time}:{base64.b64encode(key).decode()}:{expiration_time}"
+        ticket = f"{self.version}|{client_id}|{server_id}"
+        ticket += f"{creation_time}|{base64.b64encode(key).decode()}|{expiration_time}"
         # TODO: encrypt the expiration time
         return ticket
 
@@ -220,7 +157,7 @@ class KerberosAuthServer:
         :return: parsed dict with the request
         """
         # temp
-        client = get_name_and_password()
+        client = name_generator()
         print(client)
         return client
         # return {
@@ -248,7 +185,7 @@ class KerberosAuthServer:
                 client_id = request["Header"]["ID"]
                 nonce = request["Payload"]["nonce"]
                 response = self.generate_session_key(client_id,
-                                                     self.message_sever.get("uuid"), nonce)
+                                                     self.message_sevrer.get("uuid"), nonce)
                 print("Created session key!")
                 # try:
                 #     print(json.dumps(dict(response)))
@@ -258,7 +195,7 @@ class KerberosAuthServer:
                 encrypted_key = {
                     "AES Key": encrypt_aes(response.get('key'), nonce, nonce),
                     "Nonce": encrypt_aes(response.get('key'), nonce, nonce),
-                    "Encrypted Key IV": ""
+                    "Encrypted Key IV": create_iv()
                 }
                 payload = {
                     "encrypted_key": encrypted_key,
@@ -317,7 +254,7 @@ class KerberosAuthServer:
                 "ID": client_id
             },
             "Payload": {
-                "server_id": self.message_sever.get("uuid"),
+                "server_id": self.message_sevrer.get("uuid"),
                 "nonce": create_nonce()
             }
         }
@@ -326,7 +263,7 @@ class KerberosAuthServer:
         response = self.handle_client_request(client_request)
         print(f"Server reply: {response}")
 
-
+        # TODO: Use infinite loops again
         # while True:
         #     client_request = self.receive_client_request()
         #     if client_request:
@@ -398,7 +335,7 @@ def main():
     print(f"my clients are: {server.clients}")
     print(f"using port: {server.port}")
     print(f"my version is {server.version}")
-    print(f"message_sever in use: {server.message_sever}")
+    print(f"message_sever in use: {server.message_sevrer}")
     print(f"my messaging servers {server.servers}")
     server.start_server()
 
