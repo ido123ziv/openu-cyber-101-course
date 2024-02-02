@@ -1,4 +1,3 @@
-import base64
 import threading
 from shared_server import *
 
@@ -210,6 +209,10 @@ class KerberosMessageServer:
         infinite loop, listening to requests from clients
         :return:
         """
+        # TODO: add methods to check this
+        print(f"Server started on port: {self.port}")
+        client = self.receive_client_request()
+
         pass
         # while True:
         #     client_request = self.receive_client_request()
