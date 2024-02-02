@@ -95,24 +95,28 @@ class KerberosAuthServer:
         bytes_key = str(key).encode()[32:]
         print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
         aes_key = AES.new(bytes_key, AES.MODE_CBC, iv=create_iv())
-        ticket_aes_key = encrypt_aes(aes_key, nonce, bytes_key)
+        ticket_aes_key = AES.new(base64.b64decode(self.message_server.get('key')), AES.MODE_CBC, iv=create_iv())
+        encrypted_ticket_key = encrypt_aes(ticket_aes_key, nonce, bytes_key)
+        creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
+        encrypted_time = encrypt_aes(ticket_aes_key, nonce, expiration_time)
         # aes_key = AES.new(get_random_bytes(32), AES.MODE_CBC, iv=get_random_bytes(16))
-        ticket_payload = self.generate_ticket(client_id, server_id, ticket_aes_key)
+        ticket_payload = self.generate_ticket(client_id, server_id, encrypted_ticket_key, creation_time, encrypted_time)
         return {
             "key": aes_key,
             "ticket": encrypt_aes(aes_key, nonce, ticket_payload.encode())
         }
 
-    def generate_ticket(self, client_id, server_id, key):
+    def generate_ticket(self, client_id, server_id, key, creation_time, expiration_time):
         """
         generate tgt from given key
+        :param expiration_time:
+        :param creation_time:
         :param server_id: message server id
         :param key: AES Key used for encryption
         :param client_id: client initiated request
         :return: tgt
         """
-        creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
         # ticket = f"{client_id}:{service_id}:{base64.b64encode(self.generate_salt()).decode()}"
         ticket = f"{self.version}|{client_id}|{server_id}"
         ticket += f"{creation_time}|{base64.b64encode(key).decode()}|{expiration_time}"
