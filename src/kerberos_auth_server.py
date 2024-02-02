@@ -11,14 +11,26 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Hash import SHA256
 from uuid import uuid1
-
+import string
 CLIENT_FILE = "clients.info"
 # todo use multiple message services for now leave it
 SERVERS_FILE = "servers.info"
 
 
+def name_generator():
+    orig = 'klmnopqrstuvwxyza'
+    for let in orig:
+        ind = orig.index(let)
+        suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
+        try:
+            print(f"{ind + 10}: " + "{\"Name\": \"" + let + f"{suffix}\", \"Password\": \"" + orig[ind].upper() + orig[
+                ind + 1] + "123456!\"},")
+        except Exception as e:
+            print("26: {Name\": \"zina\", \"Password\": \"Za123456!}")
+
+
 def get_name_and_password():
-    key = random.randrange(0, 10)
+    key = random.randrange(0, 26)
     switcher = {
         0: {"Name": "alice", "Password": "Ab123456!"},
         1: {"Name": "bob", "Password": "Bc123456!"},
@@ -29,7 +41,24 @@ def get_name_and_password():
         6: {"Name": "grant", "Password": "Gh123456!"},
         7: {"Name": "homer", "Password": "Hi123456!"},
         8: {"Name": "ivan", "Password": "Ij123456!"},
-        9: {"Name": "jake", "Password": "Jk123456!"}
+        9: {"Name": "jake", "Password": "Jk123456!"},
+        10: {"Name": "kI29", "Password": "Kl123456!"},
+        11: {"Name": "lDVP", "Password": "Lm123456!"},
+        12: {"Name": "mV0B", "Password": "Mn123456!"},
+        13: {"Name": "n2PK", "Password": "No123456!"},
+        14: {"Name": "oP0K", "Password": "Op123456!"},
+        15: {"Name": "pCUX", "Password": "Pq123456!"},
+        16: {"Name": "qO3V", "Password": "Qr123456!"},
+        17: {"Name": "r4LO", "Password": "Rs123456!"},
+        18: {"Name": "s27Q", "Password": "St123456!"},
+        19: {"Name": "tLJG", "Password": "Tu123456!"},
+        20: {"Name": "uVJO", "Password": "Uv123456!"},
+        21: {"Name": "vAO2", "Password": "Vw123456!"},
+        22: {"Name": "wT49", "Password": "Wx123456!"},
+        23: {"Name": "x2Q2", "Password": "Xy123456!"},
+        24: {"Name": "yURB", "Password": "Yz123456!"},
+        25: {"Name": "z8SE", "Password": "Za123456!"},
+        26: {"Name": "zina", "Password": "Za123456!"}
     }
     return switcher.get(key)
 
@@ -149,8 +178,13 @@ class KerberosAuthServer:
         clients_ids = [x["ID"] for x in self.clients]
         client_index = clients_ids.index(client_id)
         client = self.clients[client_index]
-        aes_key = AES.new(client.get("PasswordHash"), AES.MODE_CBC, iv=nonce)
-        ticket_payload = self.generate_ticket(client_id, server_id, aes_key)
+        key = client.get("PasswordHash")
+        bytes_key = str(key).encode()[32:]
+        print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
+        aes_key = AES.new(bytes_key, AES.MODE_CBC, iv=nonce)
+        ticket_aes_key = self.encrypt_aes(aes_key, nonce, key)
+        # aes_key = AES.new(get_random_bytes(32), AES.MODE_CBC, iv=get_random_bytes(16))
+        ticket_payload = self.generate_ticket(client_id, server_id, ticket_aes_key)
         return aes_key, self.encrypt_aes(aes_key, ticket_payload, nonce)
 
     def generate_ticket(self, client_id, server_id, key):
@@ -303,7 +337,7 @@ class KerberosAuthServer:
             },
             "Payload": {
                 "server_id": self.message_sever.get("uuid"),
-                "nonce": get_random_bytes(32)
+                "nonce": get_random_bytes(16)
             }
         }
         client_request["Header"]["Payload Size"] = len(client_request["Payload"])

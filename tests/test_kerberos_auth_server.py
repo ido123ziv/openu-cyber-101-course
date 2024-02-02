@@ -31,6 +31,7 @@ def test_clients(server):
 
 
 # test needed:
+# TODO:
 """
 register a client
 terminate server and see if clients are reserved
