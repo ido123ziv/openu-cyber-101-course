@@ -28,7 +28,7 @@ class KerberosAuthServer:
         self._clients = load_clients()
         self._port = get_port()
         self._version = get_version()
-        self._message_sever = get_message_servers()
+        self._message_server = get_message_servers()
         self._servers = {}
         # self.lock = threading.Lock()
 
@@ -66,12 +66,12 @@ class KerberosAuthServer:
         return self._servers
 
     @property
-    def message_sevrer(self):
+    def message_server(self):
         """
         getter for message_sever property 
         :return: dict of current message server info
         """
-        return self._message_sever
+        return self._message_server
 
     # TODO add a parsing to the client names
     def get_clients_names(self):
