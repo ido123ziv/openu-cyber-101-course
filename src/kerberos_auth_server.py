@@ -119,6 +119,7 @@ class KerberosAuthServer:
         """
         return self._version
 
+    # TODO add support for multi servers using threads
     @property
     def servers(self):
         """
@@ -142,31 +143,6 @@ class KerberosAuthServer:
         :return: a list of all client names
         """
         return [x["Name"] for x in self.clients]
-
-    # # TODO: check if needed
-    # def generate_salt(self):
-    #     """
-    #     :return: salt ?
-    #     """
-    #     return get_random_bytes(16)
-
-    def encrypt_aes(self, aes_key, nonce, data):
-        """
-
-        :param aes_key: AES Symmetric Key in used
-        :param data: data to encrypt
-        :param nonce: random value created by the client
-        :return:
-        """
-        ciphertext = aes_key.encrypt(pad(data, AES.block_size))
-        return base64.b64encode(nonce + ciphertext)
-
-    def decrypt_aes(self, encrypted_data, key):
-        data = base64.b64decode(encrypted_data)
-        iv, ciphertext = data[:16], data[16:]
-        cipher = AES.new(key, iv, AES.MODE_CBC)
-        decrypted_data = unpad(cipher.decrypt(ciphertext), AES.block_size)
-        return decrypted_data
 
     def generate_session_key(self, client_id, server_id, nonce):
         """
@@ -205,10 +181,6 @@ class KerberosAuthServer:
         ticket += f"{creation_time}:{base64.b64encode(key).decode()}:{expiration_time}"
         # TODO: encrypt the expiration time
         return ticket
-
-    # TODO add support for multi servers using threads
-    def get_servers(self):
-        pass
 
     def register(self, request):
         """
@@ -324,6 +296,7 @@ class KerberosAuthServer:
             print(f"Server reply: {response}")
             return response
         return "Error"
+
     def start_server(self):
         """
         infinite loop of listening server
