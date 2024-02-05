@@ -1,7 +1,8 @@
+from datetime import datetime
+
 from kerberos_auth_server import KerberosAuthServer as authserver
 from kerberos_message_server import KerberosMessageServer as msgserver
 from shared_server import *
-from Crypto.Random import get_random_bytes
 
 CLIENT_FILE = "me.info"
 ERROR_MESSAGE = "Server responded with an error."
@@ -63,7 +64,31 @@ class KerberosClient:
         except FileNotFoundError as e:
             return e
 
-    
+
+    def create_authenticator(self, uuid):
+        """
+        creates an authenticator using an AES key.
+        :param uuid: client unique id.
+        :return: the authenticator that was created.
+        """
+        nonce = create_nonce()
+        encrypted_version = str(encrypt_aes(self.aes_key, nonce, get_version()))
+        encrypted_client_id = str(encrypt_aes(self.aes_key, nonce, uuid))
+        encrypted_server_id = str(encrypt_aes(self.aes_key, nonce, SERVER_ID))
+        creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        encrypted_timestamp = str(encrypt_aes(self.aes_key, nonce, creation_time))
+        iv = create_iv()
+
+        authenticatorSize = len(iv) + len(encrypted_version) + len(encrypted_client_id) + len(encrypted_server_id) + len(encrypted_timestamp)
+        return {
+            "authenticatorIV": iv,
+            "version": encrypted_version,
+            "clientID": encrypted_client_id,
+            "serverID": encrypted_server_id,
+            "creationTime": encrypted_timestamp
+        }, authenticatorSize
+
+
     def register(self, username: str):
         """
         sends a register request to the auth server.
@@ -126,8 +151,8 @@ class KerberosClient:
             except ValueError as e:
                 print(e)
                 print(ERROR_MESSAGE)
-        except FileNotFoundError as e:
-            print(e)
+        except FileNotFoundError:
+            print("File 'me.info' was not found.")
             exit(1)
             
 
@@ -137,32 +162,24 @@ class KerberosClient:
         :param aes_key: AES Symmetric Key.
         """
         try:
-            client_info = self.get_client_info()
-            uuid = client_info["uuid"]
-            authenticator = {
-                "authenticatorIV": 
-                "version":
-                "clientID": uuid,
-                "serverID": 
-                "creationTime":
-            }
-            ticket = 
+            uuid = self.get_client_info()["uuid"]
+            authenticator, authenticatorSize = self.create_authenticator(uuid)
+            ticket = self.ticket
             request = {
                 "header": {
                     "clientID": uuid,
                     "version": self.version,
                     "code": 1028,
-                    "payloadSize": len(authenticator) + len(ticket)
+                    "payloadSize": authenticatorSize + len(ticket)
                 },
                 "payload":{
-                    "authenticator": ,
-                    "ticket": 
+                    "authenticator": authenticator,
+                    "ticket": ticket
                 }
             }
             msgserver.receive_aes_key(request)
-        except FileNotFoundError as e:
-            print(e)
-            print(ERROR_MESSAGE)
+        except FileNotFoundError:
+            print("File 'me.info' was not found.")
             exit(1)
 
 
@@ -192,7 +209,6 @@ class KerberosClient:
                 }
             }
             msgserver.receive_client_request(request)
-        except FileNotFoundError as e:
-            print(e)
-            print(ERROR_MESSAGE)
+        except FileNotFoundError:
+            print("File 'me.info' was not found.")
             exit(1)
