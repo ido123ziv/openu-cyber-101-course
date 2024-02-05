@@ -81,13 +81,12 @@ class KerberosAuthServer:
         """
         return [x["Name"] for x in self.clients]
 
-    def generate_session_key(self, client_id, server_id, nonce):
+    def generate_session_key(self, request: dict):
         """
-        :param nonce: random value created by the client
-        :param server_id: messaging server id
-        :param client_id: client id of user initiated the request
+        :param request: client's request as a dict
         :return: a tuple of AES Key and ticket encrypted
         """
+        client_id = request["header"]["clientID"]
         clients_ids = [x["ID"] for x in self.clients]
         client_index = clients_ids.index(client_id)
         client = self.clients[client_index]
@@ -95,9 +94,10 @@ class KerberosAuthServer:
         bytes_key = str(key).encode()[32:]
         print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
         aes_key = AES.new(bytes_key, AES.MODE_CBC, iv=create_iv())
+        nonce = request["payload"]["nonce"]
         ticket_aes_key = encrypt_aes(aes_key, nonce, bytes_key)
         # aes_key = AES.new(get_random_bytes(32), AES.MODE_CBC, iv=get_random_bytes(16))
-        ticket_payload = self.generate_ticket(client_id, server_id, ticket_aes_key)
+        ticket_payload = self.generate_ticket(client_id, request["payload"]["serverID"], ticket_aes_key)
         return {
             "key": aes_key,
             "ticket": encrypt_aes(aes_key, nonce, ticket_payload.encode())
