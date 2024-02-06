@@ -1,7 +1,8 @@
 import json
 from datetime import datetime, timedelta
 
-# import threading
+import socket
+import threading
 from shared_server import *
 import base64
 from Crypto.Cipher import AES
@@ -9,7 +10,7 @@ from uuid import uuid1
 CLIENT_FILE = "clients.info"
 # todo use multiple message services for now leave it
 SERVERS_FILE = "servers.info"
-
+SERVER_IP = "127.0.0.1"
 
 def create_uuid():
     """creates uuid for each request, represent a client"""
@@ -27,10 +28,19 @@ class KerberosAuthServer:
         """
         self._clients = load_clients()
         self._port = get_port()
+        self._server_ip = SERVER_IP
         self._version = get_version()
         self._message_server = get_message_servers()
         self._servers = {}
         # self.lock = threading.Lock()
+
+    @property
+    def server_ip(self):
+        """
+
+        :return:
+        """
+        return self._server_ip
 
     @property
     def clients(self):
@@ -120,7 +130,6 @@ class KerberosAuthServer:
         # ticket = f"{client_id}:{service_id}:{base64.b64encode(self.generate_salt()).decode()}"
         ticket = f"{self.version}|{client_id}|{server_id}"
         ticket += f"{creation_time}|{base64.b64encode(key).decode()}|{expiration_time}"
-        # TODO: encrypt the expiration time
         return ticket
 
     def register(self, request):
@@ -154,10 +163,20 @@ class KerberosAuthServer:
             print(str(e))
             return "Error! can't add user because of {}".format(str(e))
 
-    def receive_client_request(self, request={}):
+    def receive_client_request(self, client_socket, addr):
+        try:
+            request = client_socket.recv(1024).decode("utf-8")
+            response = self.handle_client_request(json.loads(request))
+            client_socket.send(json.dumps(response).encode("utf-8"))
+        except Exception as e:
+            print(f"Error when hanlding client: {e}")
+        finally:
+            client_socket.close()
+            print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+
+    def test_receive_client_request(self):
         """
         recieve request from client and parse it
-        :param request: a dict of info
         :return: parsed dict with the request
         """
         # temp
@@ -224,7 +243,7 @@ class KerberosAuthServer:
             exit(1)
 
     def register_user(self):
-        client_name_for_request = self.receive_client_request()
+        client_name_for_request = self.test_receive_client_request()
         if client_name_for_request:
             client_request = {
                 "header": {
@@ -238,13 +257,7 @@ class KerberosAuthServer:
             return response
         return "Error"
 
-    def start_server(self):
-        """
-        infinite loop of listening server
-        :return:
-        """
-        print(f"Server Started on port {self.port}")
-        # client_request = self.receive_client_request()
+    def test_server(self):
         response = self.register_user()
         while "Error" in response:
             response = self.register_user()
@@ -266,6 +279,33 @@ class KerberosAuthServer:
         print(json.dumps(client_request, indent=4, default=str))
         response = self.handle_client_request(client_request)
         print(f"Server reply: {response}")
+
+    def start_server(self):
+        """
+        infinite loop of listening server
+        :return:
+        """
+        # client_request = self.receive_client_request()
+        try:
+            print(f"Server Started on port {self.port}")
+            server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # bind the socket to the host and port
+            server.bind((self.server_ip, self.port))
+            # listen for incoming connections
+            server.listen()
+            print(f"Listening on {self.server_ip}:{self.port}")
+
+            while True:
+                # accept a client connection
+                client_socket, addr = server.accept()
+                print(f"Accepted connection from {addr[0]}:{addr[1]}")
+                # start a new thread to handle the client
+                thread = threading.Thread(target=self.receive_client_request, args=(client_socket, addr,))
+                thread.start()
+        except Exception as e:
+            print(f"Error: {e}")
+        finally:
+            server.close()
 
         # TODO: Use infinite loops again
         # while True:
@@ -341,7 +381,9 @@ def main():
     print(f"my version is {server.version}")
     print(f"message_sever in use: {server.message_server}")
     print(f"my messaging servers {server.servers}")
+    server.test_server()
     server.start_server()
+
 
 
 if __name__ == "__main__":
