@@ -119,14 +119,14 @@ class KerberosMessageServer:
         :return: response code whether succeeded or not
         """
         try:
-            ticket = request.get("Ticket")
-            authenticator = request("Authenticator")
+            ticket = request.get("ticket")
+            authenticator = request("authenticator")
             aes_key = ticket.decode().split('|')[-2:-1]
             auth_data = decrypt_aes(authenticator, self.key)
             self._clients.add({
-                "client_id": auth_data['client_id'],
+                "client_id": auth_data['clientID'],
                 "key": aes_key,
-                "auth_iv": auth_data["Authenticator IV"]
+                "auth_iv": auth_data["authenticatorIV"]
             })
             return dict(Code=1604)
         except Exception as e:
@@ -158,8 +158,8 @@ class KerberosMessageServer:
         """
         try:
             # TODO: check if message size matches the payload
-            message = request["Message Content"]
-            client_key = self.find_client_by_iv(request["Message IV"])
+            message = request["messageContent"]
+            client_key = self.find_client_by_iv(request["messageIV"])
             if client_key == {}:
                 raise ValueError("User Not Found")
             decrypted_message = decrypt_aes(message, client_key)
@@ -193,16 +193,16 @@ class KerberosMessageServer:
         try:
             if not request:
                 raise NameError("request is empty!")
-            code = request["Header"]["Code"]
+            code = request["header"]["code"]
             if code == 1028:
-                return self.get_and_decrypt_key(request["Payload"])
+                return self.get_and_decrypt_key(request["payload"])
             elif code == 1029:
-                return self.print_message(request["Payload"])
+                return self.print_message(request["payload"])
             else:
                 raise ValueError("Not Valid request code")
         except Exception as e:
             print(str(e))
-            return {"Code": default_error()}
+            return {"code": default_error()}
 
     def start_server(self):
         """
