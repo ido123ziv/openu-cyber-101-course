@@ -2,6 +2,7 @@
 exclude =
     migrations
     old-deprecated
+    sockets-testing
     __pycache__
     src/kerberos_client.py
     env
