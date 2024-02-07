@@ -21,16 +21,17 @@ def read_servers_info():
             return {
                 "auth": {
                     "ip": auth_details[0],
-                    "port": auth_details[1]
+                    "port": int(auth_details[1].strip())
                 },
                 "msg": {
                     "ip": msg_details[0],
-                    "port": msg_details[1]
+                    "port": int(msg_details[1].strip())
                 }
             }
     except Exception as e:
         print(str(e))
         exit(1)
+
 
 class KerberosClient:
     """    
@@ -102,12 +103,16 @@ class KerberosClient:
 
     def create_sha256(self, password):
         self._sha256 = create_password_sha(password)
+
     def get_client_info(self):
         try:
             with open(CLIENT_FILE, 'r') as client_file:
                 data = client_file.readlines()
                 return {"username": data[0], "uuid": data[1]}
         except FileNotFoundError as e:
+            print(str(e))
+            return e
+        except IndexError as e:
             print(str(e))
             return e
 
@@ -117,10 +122,11 @@ class KerberosClient:
         :param username: string representing a username.
         """
         try:
+            # TODO: check if e is an error
             client_info = self.get_client_info()
             username = client_info["username"]
             uuid = client_info["uuid"]
-        except FileNotFoundError as e:
+        except Exception as e:
             print(e)
             username = input("Enter username: ")
             password = input("Enter password: ")
@@ -139,10 +145,12 @@ class KerberosClient:
             response = self.send_message(json.dumps(request))
             uuid = json.loads(response)["payload"]
             # uuid = authserver.register(request)["payload"]
-            self.create_sha256()
+            self.create_sha256(password)
+            # TODO: better error handling on this, finally gets a lot of errors in this flow
         finally:
-            with open(CLIENT_FILE, 'w') as client_file:
-                client_file.writelines([username, uuid])
+            if username and uuid:
+                with open(CLIENT_FILE, 'w') as client_file:
+                    client_file.writelines([username, uuid])
 
     def receive_aes_key(self):
         """
@@ -168,19 +176,19 @@ class KerberosClient:
         pass
 
 
-    def send_message(self, message: str):
-        """
-        encrypts a given message and sends it to the message server.
-        :param message: a message to encrypt.
-        """
-        nonce = create_nonce()
-        encrypted_message = encrypt_aes(self.aes_key, nonce, message)
-        request = {
-            "message_size": len(encrypted_message),
-            "message_IV": create_iv(),
-            "message_content": encrypted_message
-        }
-        # TODO send reuest to message server
+    # def send_message(self, message: str):
+    #     """
+    #     encrypts a given message and sends it to the message server.
+    #     :param message: a message to encrypt.
+    #     """
+    #     nonce = create_nonce()
+    #     encrypted_message = encrypt_aes(self.aes_key, nonce, message)
+    #     request = {
+    #         "message_size": len(encrypted_message),
+    #         "message_IV": create_iv(),
+    #         "message_content": encrypted_message
+    #     }
+    #     # TODO send reuest to message server
 
 
 def main():

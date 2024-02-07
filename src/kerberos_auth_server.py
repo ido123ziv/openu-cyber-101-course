@@ -384,7 +384,7 @@ def main():
     print(f"message_sever in use: {server.message_server}")
     print(f"my messaging servers {server.servers}")
     server.test_server()
-    # server.start_server()
+    server.start_server()
 
 
 if __name__ == "__main__":
