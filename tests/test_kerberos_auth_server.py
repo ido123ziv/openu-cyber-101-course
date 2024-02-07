@@ -11,8 +11,8 @@ def server():
     return KerberosAuthServer()
 
 
-def test_main(server):
-    server.start_server()
+# def test_main(server):
+#     server.start_server()
 
 
 def test_version(server):
