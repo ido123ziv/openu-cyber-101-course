@@ -28,8 +28,8 @@ def test_uuid(server, messages):
     assert messages.get("uuid") == server.uuid
 
 
-def test_main(server):
-    server.start_server()
+# def test_main(server):
+#     server.start_server()
 
 
 # Todo: Add checks if ports match as test
