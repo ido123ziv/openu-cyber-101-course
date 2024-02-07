@@ -12,9 +12,11 @@ MESSAGE_SERVER_FILE = "msg.info"
 PROTOCOL_VERSION = 24
 
 
+# Todo: change to auth server port
 def get_port():
     try:
         with open(PORT_FILE, 'r') as portfile:
+            # Todo: cast to int
             port = portfile.readline().strip()
             if port:
                 return port

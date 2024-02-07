@@ -201,6 +201,7 @@ class KerberosAuthServer:
         try:
             if not request:
                 raise NameError("request is empty!")
+            # Todo: print as json, add error handeling for json
             print(request)
             code = request["header"]["code"]
             if code == 1024:

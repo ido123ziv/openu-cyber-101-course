@@ -1,6 +1,6 @@
 import json
 
-from kerberos_auth_server import KerberosAuthServer as authserver
+# from kerberos_auth_server import KerberosAuthServer as authserver
 from shared_server import *
 import socket
 
@@ -12,6 +12,10 @@ SERVER_ID = "hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711"
 
 
 def read_servers_info():
+    """
+
+    :return:
+    """
     try:
         with open(SERVERS_FILE, 'r') as servers_file:
             servers_details = servers_file.readlines()
@@ -47,6 +51,12 @@ class KerberosClient:
         self._sha256 = None
 
     def send_message(self, message: str, server="auth"):
+        """
+
+        :param message:
+        :param server:
+        :return:
+        """
 
         if server != "auth":
             server_ip = self._msg_server.get("ip")
@@ -56,6 +66,7 @@ class KerberosClient:
             server_port = self._auth_server.get("port")
 
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # TODO: better error handeling. If socket can't be open say it
         client.connect((server_ip, server_port))
         try:
             client.send(message.encode("utf-8")[:1024])
@@ -102,9 +113,18 @@ class KerberosClient:
         return self._sha256
 
     def create_sha256(self, password):
+        """
+
+        :param password:
+        :return:
+        """
         self._sha256 = create_password_sha(password)
 
     def get_client_info(self):
+        """
+
+        :return:
+        """
         try:
             with open(CLIENT_FILE, 'r') as client_file:
                 data = client_file.readlines()
@@ -192,10 +212,15 @@ class KerberosClient:
 
 
 def main():
+    """
+
+    :return:
+    """
     client = KerberosClient()
     client.register()
 
 
+# Todo: support for multiple clients
 if __name__ == "__main__":
     print("Hello World")
     main()
