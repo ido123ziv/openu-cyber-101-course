@@ -1,5 +1,7 @@
+import json
 import threading
 from shared_server import *
+import socket
 
 SERVER_FILE = "msg.info"
 
@@ -57,7 +59,8 @@ class KerberosMessageServer:
         """
         try:
             server = get_message_servers()
-            self._port = server["port"]
+            self._port = int(server["port"])
+            self._ip = server["ip"]
             self._name = server["name"]
             self._uuid = server["uuid"]
             self._version = get_version()
@@ -67,6 +70,10 @@ class KerberosMessageServer:
         except Exception as e:
             print(str(e))
             default_error()
+
+    @property
+    def ip(self):
+        return self._ip
 
     @property
     def version(self):
@@ -159,30 +166,43 @@ class KerberosMessageServer:
         try:
             # TODO: check if message size matches the payload
             message = request["messageContent"]
-            client_key = self.find_client_by_iv(request["messageIV"])
-            if client_key == {}:
-                raise ValueError("User Not Found")
-            decrypted_message = decrypt_aes(message, client_key)
-            print(decrypted_message)
+            # TODO: restore this
+            # client_key = self.find_client_by_iv(request["messageIV"])
+            # if client_key == {}:
+            #     raise ValueError("User Not Found")
+            # decrypted_message = decrypt_aes(message, client_key)
+            # print(decrypted_message)
+            print(message)
             return dict(Code=1605)
         except Exception as e:
             print(str(e))
             return default_error()
 
-    def receive_client_request(self, request={}):
+    def receive_client_request(self, client_socket, addr):
+        try:
+            request = client_socket.recv(1024).decode("utf-8")
+            response = self.handle_client_request(json.loads(request))
+            client_socket.send(json.dumps(response).encode("utf-8"))
+        except Exception as e:
+            print(f"Error when handling client: {e}")
+        finally:
+            client_socket.close()
+            print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+        # self.get_and_decrypt_key()
+        # self.print_message()
+
+    def test_client(self, request={}):
         """
-        Generates temporarily client
-        :param request:
-        :return: client name
-        """
+       Generates temporarily client
+       :param request:
+       :return: client name
+       """
         if request is None or request == {}:
             client = name_generator()
         else:
             client = request.get('client')
         print(f"see client: {client}")
         return client
-        # self.get_and_decrypt_key()
-        # self.print_message()
 
     def handle_client_request(self, request):
         """
@@ -193,6 +213,7 @@ class KerberosMessageServer:
         try:
             if not request:
                 raise NameError("request is empty!")
+            print(f"Got Request: {request}")
             code = request["header"]["code"]
             if code == 1028:
                 return self.get_and_decrypt_key(request["payload"])
@@ -210,9 +231,26 @@ class KerberosMessageServer:
         :return:
         """
         # TODO: add methods to check this
-        print(f"Server started on port: {self.port}")
-        client = self.receive_client_request()
+        try:
+            print(f"Message Server Started on port {self.port}")
+            server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # bind the socket to the host and port
+            server.bind((self.ip, self.port))
+            # listen for incoming connections
+            server.listen()
+            print(f"Listening on {self.ip}:{self.port}")
 
+            while True:
+                # accept a client connection
+                client_socket, addr = server.accept()
+                print(f"Accepted connection from {addr[0]}:{addr[1]}")
+                # start a new thread to handle the client
+                thread = threading.Thread(target=self.receive_client_request, args=(client_socket, addr,))
+                thread.start()
+        except Exception as e:
+            print(f"Error: {e}")
+        finally:
+            server.close()
         pass
         # while True:
         #     client_request = self.receive_client_request()
@@ -239,4 +277,3 @@ def main():
 if __name__ == "__main__":
     print("Hello World")
     main()
-

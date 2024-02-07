@@ -46,11 +46,12 @@ class KerberosClient:
         self._auth_server = servers.get("auth")
         self._msg_server = servers.get("msg")
         self._version = get_version()
+        self._client_id = None
         self._aes_key = None
         self._ticket = None
         self._sha256 = None
 
-    def send_message(self, message: str, server="auth"):
+    def send_message_to_server(self, message: str, server="auth"):
         """
 
         :param message:
@@ -79,6 +80,23 @@ class KerberosClient:
         finally:
             client.close()
             print("Connection to server closed")
+
+    @property
+    def client_id(self):
+        """
+
+        :return:
+        """
+        return self._client_id
+
+    @client_id.setter
+    def client_id(self, uuid):
+        """
+
+        :param uuid:
+        :return:
+        """
+        self._client_id = uuid
 
     @property
     def version(self):
@@ -128,7 +146,7 @@ class KerberosClient:
         try:
             with open(CLIENT_FILE, 'r') as client_file:
                 data = client_file.readlines()
-                return {"username": data[0], "uuid": data[1]}
+                return {"username": data[0].strip(), "uuid": data[1].strip()}
         except FileNotFoundError as e:
             print(str(e))
             return e
@@ -146,8 +164,9 @@ class KerberosClient:
             client_info = self.get_client_info()
             username = client_info["username"]
             uuid = client_info["uuid"]
+            self.client_id(uuid)
         except Exception as e:
-            print(e)
+            print(f"Caught Exception: {str(e)}")
             username = input("Enter username: ")
             password = input("Enter password: ")
             request = {
@@ -162,15 +181,16 @@ class KerberosClient:
                     "password": password
                 }
             }
-            response = self.send_message(json.dumps(request))
+            response = self.send_message_to_server(json.dumps(request))
             uuid = json.loads(response)["payload"]
             # uuid = authserver.register(request)["payload"]
             self.create_sha256(password)
+            self.client_id(uuid)
             # TODO: better error handling on this, finally gets a lot of errors in this flow
         finally:
             if username and uuid:
                 with open(CLIENT_FILE, 'w') as client_file:
-                    client_file.writelines([username, uuid])
+                    client_file.writelines([username+"\n", uuid])
 
     def receive_aes_key(self):
         """
@@ -178,15 +198,15 @@ class KerberosClient:
         decrypts the key and saves it along with the ticket for future use.
         """
         nonce = create_nonce()
-        encrypted_key, ticket = authserver.generate_session_key(self.uuid, SERVER_ID, nonce)
+        # encrypted_key, ticket = authserver.generate_session_key(self.uuid, SERVER_ID, nonce)
         try:
-            decrypted_key = decrypt_aes(encrypted_key, self.sha256)
-            self.aes_key = decrypted_key
-            self.ticket = ticket
+            # decrypted_key = decrypt_aes(encrypted_key, self.sha256)
+            # self.aes_key = decrypted_key
+            # self.ticket = ticket
+            pass
         except ValueError as e:
-            print(e)
+            print(f"Error: {str(e)}")
             print(ERROR_MESSAGE)
-            
 
     def send_aes_key(self, aes_key):
         """
@@ -195,20 +215,36 @@ class KerberosClient:
         """
         pass
 
-
-    # def send_message(self, message: str):
-    #     """
-    #     encrypts a given message and sends it to the message server.
-    #     :param message: a message to encrypt.
-    #     """
-    #     nonce = create_nonce()
-    #     encrypted_message = encrypt_aes(self.aes_key, nonce, message)
-    #     request = {
-    #         "message_size": len(encrypted_message),
-    #         "message_IV": create_iv(),
-    #         "message_content": encrypted_message
-    #     }
-    #     # TODO send reuest to message server
+    def send_message_for_print(self, message: str):
+        """
+        encrypts a given message and sends it to the message server.
+        :param message: a message to encrypt.
+        """
+        nonce = create_nonce()
+        # encrypted_message = encrypt_aes(self.aes_key, nonce, message)
+        encrypted_message = message.strip()
+        payload = {
+            "messageSize": len(encrypted_message),
+            # "messageIV": create_iv(),
+            "messageIV": str(create_iv()),
+            "messageContent": encrypted_message
+        }
+        request = {
+            "header": {
+                "clientID": self.client_id,  # the server will ignore this field
+                "version": self.version,
+                "code": 1029,
+                "payloadSize": len(json.dumps(payload))
+            },
+            "payload": payload
+        }
+        try:
+            print(f"Sending: {json.dumps(request)}")
+            response = self.send_message_to_server(json.dumps(request), server="msg")
+            print(response)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            print(ERROR_MESSAGE)
 
 
 def main():
@@ -218,6 +254,7 @@ def main():
     """
     client = KerberosClient()
     client.register()
+    client.send_message_for_print("Message!")
 
 
 # Todo: support for multiple clients

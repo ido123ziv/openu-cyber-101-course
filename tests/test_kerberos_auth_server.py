@@ -30,6 +30,10 @@ def test_clients(server):
     assert len(server.clients) == len(clients)
 
 
+def test_auth_server_functionality(server):
+    server.test_server()
+
+
 # test needed:
 # TODO:
 """

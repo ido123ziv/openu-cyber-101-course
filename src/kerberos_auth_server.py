@@ -170,7 +170,7 @@ class KerberosAuthServer:
             response = self.handle_client_request(json.loads(request))
             client_socket.send(json.dumps(response).encode("utf-8"))
         except Exception as e:
-            print(f"Error when hanlding client: {e}")
+            print(f"Error when handling client: {e}")
         finally:
             client_socket.close()
             print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
@@ -260,6 +260,7 @@ class KerberosAuthServer:
             return response
         return "Error"
 
+    # Todo: move to tests file
     def test_server(self):
         response = self.register_user()
         while "Error" in response:
@@ -384,7 +385,6 @@ def main():
     print(f"my version is {server.version}")
     print(f"message_sever in use: {server.message_server}")
     print(f"my messaging servers {server.servers}")
-    server.test_server()
     server.start_server()
 
 
