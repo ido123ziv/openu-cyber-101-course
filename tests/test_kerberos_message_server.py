@@ -21,7 +21,7 @@ def test_version(server):
 
 
 def test_port(server, messages):
-    assert messages.get("port") == server.port
+    assert int(messages.get("port")) == server.port
 
 
 def test_uuid(server, messages):
