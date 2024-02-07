@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 
 import socket
+# TODO: add struct usage
 import threading
 from shared_server import *
 import base64
@@ -109,7 +110,7 @@ class KerberosAuthServer:
         encrypted_ticket_key = encrypt_aes(ticket_aes_key, nonce, bytes_key)
         creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
-        encrypted_time = encrypt_aes(ticket_aes_key, nonce, expiration_time)
+        encrypted_time = encrypt_aes(ticket_aes_key, nonce, expiration_time.encode())
         # aes_key = AES.new(get_random_bytes(32), AES.MODE_CBC, iv=get_random_bytes(16))
         ticket_payload = self.generate_ticket(client_id, server_id, encrypted_ticket_key, creation_time, encrypted_time)
         return {
@@ -142,7 +143,7 @@ class KerberosAuthServer:
                 return "Error, Name already exists!"
             else:
                 client_id = create_uuid()
-                password_hash = create_password_sha(request["Password"])
+                password_hash = create_password_sha(request["password"])
                 self.clients.append(
                     {
                         "clientID": str(client_id),
@@ -200,6 +201,7 @@ class KerberosAuthServer:
         try:
             if not request:
                 raise NameError("request is empty!")
+            print(request)
             code = request["header"]["code"]
             if code == 1024:
                 return self.register(request["payload"])
@@ -382,8 +384,7 @@ def main():
     print(f"message_sever in use: {server.message_server}")
     print(f"my messaging servers {server.servers}")
     server.test_server()
-    server.start_server()
-
+    # server.start_server()
 
 
 if __name__ == "__main__":
