@@ -57,6 +57,11 @@ class KerberosClient:
 
 
     def get_client_info(self):
+        """
+        reads client's name and uuid from 'me.info' file.
+        :return: a dict containing the name and the uuid. 
+        raises FileNotFoundError if the file does not exist.
+        """
         try:
             with open(CLIENT_FILE, 'r') as client_file:
                 data = client_file.readlines()
