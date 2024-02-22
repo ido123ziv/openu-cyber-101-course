@@ -89,8 +89,7 @@ class KerberosClient:
         """
         return self._client_id
 
-    @client_id.setter
-    def client_id(self, uuid):
+    def __client_id__(self, uuid):
         """
 
         :param uuid:
@@ -164,7 +163,7 @@ class KerberosClient:
             client_info = self.get_client_info()
             username = client_info["username"]
             uuid = client_info["uuid"]
-            self.client_id(uuid)
+            self.__client_id__(uuid)
         except Exception as e:
             print(f"Caught Exception: {str(e)}")
             username = input("Enter username: ")
@@ -185,7 +184,7 @@ class KerberosClient:
             uuid = json.loads(response)["payload"]
             # uuid = authserver.register(request)["payload"]
             self.create_sha256(password)
-            self.client_id(uuid)
+            self.__client_id__(uuid)
             # TODO: better error handling on this, finally gets a lot of errors in this flow
         finally:
             if username and uuid:
