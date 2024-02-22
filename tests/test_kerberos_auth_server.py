@@ -11,8 +11,8 @@ def server():
     return KerberosAuthServer()
 
 
-def test_main(server):
-    server.start_server()
+# def test_main(server):
+#     server.start_server()
 
 
 def test_version(server):
@@ -28,6 +28,10 @@ def test_clients(server):
     with open(CLIENT_FILE, 'r') as clinets_file:
         clients = clinets_file.readlines()
     assert len(server.clients) == len(clients)
+
+
+def test_auth_server_functionality(server):
+    server.test_server()
 
 
 # test needed:

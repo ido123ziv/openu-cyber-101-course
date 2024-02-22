@@ -12,9 +12,11 @@ MESSAGE_SERVER_FILE = "msg.info"
 PROTOCOL_VERSION = 24
 
 
+# Todo: change to auth server port
 def get_port():
     try:
         with open(PORT_FILE, 'r') as portfile:
+            # Todo: cast to int
             port = portfile.readline().strip()
             if port:
                 return port
@@ -36,10 +38,10 @@ def get_message_servers(write=False):
         with open(MESSAGE_SERVER_FILE, flag) as msg_srv_file:
             message_server = msg_srv_file.readlines()
             msg_srv["ip"] = message_server[0].split(':')[0]
-            msg_srv["port"] = message_server[0].split(':')[1]
-            msg_srv["name"] = message_server[1]
-            msg_srv["uuid"] = message_server[2]
-            msg_srv["key"] = message_server[3]
+            msg_srv["port"] = message_server[0].split(':')[1].strip()
+            msg_srv["name"] = message_server[1].strip()
+            msg_srv["uuid"] = message_server[2].strip()
+            msg_srv["key"] = message_server[3].strip()
             return msg_srv
     except Exception as e:
         print(str(e))
@@ -111,5 +113,5 @@ def create_iv():
 def name_generator():
     name = ''.join(random.choices(string.ascii_lowercase, k=random.randint(3, 5)))
     password = name[0].upper() + name[0].lower() + "123456!"
-    return {"Name": name, "Password": password}
+    return {"name": name, "password": password}
 
