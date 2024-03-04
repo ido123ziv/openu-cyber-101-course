@@ -1,4 +1,5 @@
 import json
+import struct
 
 # from kerberos_auth_server import KerberosAuthServer as authserver
 from shared_server import *
@@ -41,6 +42,7 @@ class KerberosClient:
     """    
     This class represents a client used by the kerberos protocol.
     """
+
     def __init__(self):
         servers = read_servers_info()
         self._auth_server = servers.get("auth")
@@ -51,7 +53,7 @@ class KerberosClient:
         self._ticket = None
         self._sha256 = None
 
-    def send_message_to_server(self, message: str, server="auth"):
+    def send_message_to_server(self, message: dict, server="auth"):
         """
 
         :param message:
@@ -70,11 +72,15 @@ class KerberosClient:
         # TODO: better error handeling. If socket can't be open say it
         client.connect((server_ip, server_port))
         try:
-            client.send(message.encode("utf-8")[:1024])
+            header_data = struct.pack('<16sBH I',  str.encode(message["header"]["clientID"]), message["header"]["version"], message["header"]["code"], message["header"]["payloadSize"])
+
+            client.send(header_data + message["payload"].encode("utf-8"))
             response = client.recv(1024)
             response = response.decode("utf-8")
             print(f"Received: {response}")
             return response
+        except KeyError as e:
+            print(f"Wrong input of key - {e}")
         except Exception as e:
             print(f"Error: {e}")
         finally:
@@ -180,7 +186,7 @@ class KerberosClient:
                     "password": password
                 }
             }
-            response = self.send_message_to_server(json.dumps(request))
+            response = self.send_message_to_server(request)
             uuid = json.loads(response)["payload"]
             # uuid = authserver.register(request)["payload"]
             self.create_sha256(password)
@@ -189,7 +195,7 @@ class KerberosClient:
         finally:
             if username and uuid:
                 with open(CLIENT_FILE, 'w') as client_file:
-                    client_file.writelines([username+"\n", uuid])
+                    client_file.writelines([username + "\n", uuid])
 
     def receive_aes_key(self):
         """
@@ -230,7 +236,7 @@ class KerberosClient:
         }
         request = {
             "header": {
-                "clientID": self.client_id,  # the server will ignore this field
+                "clientID": "client_id12345678",  # the server will ignore this field
                 "version": self.version,
                 "code": 1029,
                 "payloadSize": len(json.dumps(payload))
@@ -239,7 +245,7 @@ class KerberosClient:
         }
         try:
             print(f"Sending: {json.dumps(request)}")
-            response = self.send_message_to_server(json.dumps(request), server="msg")
+            response = self.send_message_to_server(request, server="msg")
             print(response)
         except Exception as e:
             print(f"Error: {str(e)}")
@@ -253,7 +259,7 @@ def main():
     """
     client = KerberosClient()
     client.register()
-    client.send_message_for_print("Message!")
+    # client.send_message_for_print("Message!")
 
 
 # Todo: support for multiple clients

@@ -1,4 +1,5 @@
 import json
+import struct
 from datetime import datetime, timedelta
 
 import socket
@@ -166,8 +167,29 @@ class KerberosAuthServer:
 
     def receive_client_request(self, client_socket, addr):
         try:
-            request = client_socket.recv(1024).decode("utf-8")
-            response = self.handle_client_request(json.loads(request))
+            # receive 23 bytes of header (client id - 16, version - 1, code -2, size - 4)
+            header_data = client_socket.recv(23)
+            if len(header_data) != 23:
+                print("Header size didn't match constraints.")
+                raise ValueError
+
+            # Unpack the header fields using struct
+            client_id, version, code, payload_size = struct.unpack('<16sBB I', header_data)
+            payload_data = client_socket.recv(payload_size)
+            if len(payload_data) != payload_size:
+                print("Payload size didn't match payload, Aborting!.")
+                raise ValueError
+
+            request = {
+                "header": {
+                    "clientID": client_id,
+                    "version": version,
+                    "code": code,
+                    "payloadSize": payload_size
+                },
+                "payload": payload_data
+            }
+            response = self.handle_client_request(request)
             client_socket.send(json.dumps(response).encode("utf-8"))
         except Exception as e:
             print(f"Error when handling client: {e}")
