@@ -94,6 +94,7 @@ class KerberosAuthServer:
         return [x["name"] for x in self.clients]
 
     def generate_session_key(self, client_id, server_id, nonce):
+        # TODO: error (can only concatenate str (not "bytes") to str)
         """
         :param nonce: random value created by the client
         :param server_id: messaging server id
@@ -171,6 +172,35 @@ class KerberosAuthServer:
             print("register error: \n" + str(e))
             return "Error! can't add user because of {}".format(str(e))
 
+    def handle_key_request(self, request):
+        recived_payload = json.loads(request["payload"])
+        client_id = request["header"]["clientID"]
+        nonce = recived_payload["nonce"]
+        print("here")
+        response = self.generate_session_key(client_id,
+                                             self.message_server.get("uuid"), nonce)
+        print("Created session key!")
+        print(response)
+        # TODO: check the encrypted key iv thing
+        encrypted_key = {
+            "AES Key": encrypt_aes(response.get('key'), nonce, nonce),
+            "Nonce": encrypt_aes(response.get('key'), nonce, nonce),
+            "Encrypted Key IV": create_iv()
+        }
+        payload = {
+            "encrypted_key": encrypted_key,
+            "ticket": response.get('ticket')
+        }
+        print(f"payload: \n{payload}")
+        return {
+            "header": {
+                "code": 1603,
+                "version": self.version,
+                "payloadSize": len(payload)
+            },
+            "payload": payload
+        }
+
     def receive_client_request(self, client_socket, addr):
         try:
             # receive 23 bytes of header (client id - 16, version - 1, code -2, size - 4)
@@ -203,21 +233,6 @@ class KerberosAuthServer:
             client_socket.close()
             print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
 
-    def test_receive_client_request(self):
-        """
-        recieve request from client and parse it
-        :return: parsed dict with the request
-        """
-        # temp
-        client = name_generator()
-        print(client)
-        return client
-        # return {
-        #     "name": "alice",
-        #     "Password": "Aa132465!",
-        #     "encrypted_ticket": "encrypted_ticket_data",
-        # }
-
     def handle_client_request(self, request):
         """
         handles the request from the client
@@ -232,44 +247,16 @@ class KerberosAuthServer:
             # Todo: print as json, add error handeling for json
             print(f"handle_client_request: \n{request}")
             code = request["header"]["code"]
+            try:
+                payload = json.loads(request["payload"])
+            except Exception as e:
+                raise ValueError("Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
             if code == 1024:
-                try:
-                    payload = json.loads(request["payload"])
-                    return self.register(payload)
-                except Exception as e:
-                    raise ValueError("Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
+                return self.register(payload)
             if code == 1027:
-                # TODO: separate function
                 print("Client requested key")
-                client_id = request["header"]["clientID"]
-                nonce = request["payload"]["nonce"]
-                response = self.generate_session_key(client_id,
-                                                     self.message_server.get("uuid"), nonce)
-                print("Created session key!")
-                # try:
-                #     print(json.dumps(dict(response)))
-                # except ValueError as e:
-                print(response)
-                # TODO: check the encrypted key iv thing
-                encrypted_key = {
-                    "AES Key": encrypt_aes(response.get('key'), nonce, nonce),
-                    "Nonce": encrypt_aes(response.get('key'), nonce, nonce),
-                    "Encrypted Key IV": create_iv()
-                }
-                payload = {
-                    "encrypted_key": encrypted_key,
-                    "ticket": response.get('ticket')
-                }
-                # print(f"payload: \n{json.dumps(payload)}")
-                print(f"payload: \n{payload}")
-                return {
-                    "header": {
-                        "code": 1603,
-                        "version": self.version,
-                        "payloadSize": len(payload)
-                    },
-                    "payload": payload
-                }
+                return self.handle_key_request(request)
+
             return "Not supported yet!"
         except KeyError as e:
             print(f"Got Key Error on {e}")
@@ -277,45 +264,6 @@ class KerberosAuthServer:
         except Exception as e:
             print("handle_client_request error: \n" + str(e))
             exit(1)
-
-    def register_user(self):
-        client_name_for_request = self.test_receive_client_request()
-        if client_name_for_request:
-            client_request = {
-                "header": {
-                    "code": 1024,  # register code
-                    "version": self.version
-                },
-                "payload": client_name_for_request
-            }
-            response = self.handle_client_request(client_request)
-            print(f"Server reply: {response}")
-            return response
-        return "Error"
-
-    # Todo: move to tests file
-    def test_server(self):
-        response = self.register_user()
-        while "Error" in response:
-            response = self.register_user()
-
-        print("------------------------------------------")
-        client_id = response["payload"]
-        client_request = {
-            "header": {
-                "code": 1027,  # register code
-                "version": self.version,
-                "clientID": client_id
-            },
-            "payload": {
-                "serverID": self.message_server.get("uuid"),
-                "nonce": create_nonce()
-            }
-        }
-        client_request["header"]["payloadSize"] = len(client_request["payload"])
-        print(json.dumps(client_request, indent=4, default=str))
-        response = self.handle_client_request(client_request)
-        print(f"Server reply: {response}")
 
     def start_server(self):
         """
