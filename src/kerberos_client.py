@@ -243,7 +243,7 @@ class KerberosClient:
                 "code": 1029,
                 "payloadSize": len(json.dumps(payload))
             },
-            "payload": payload
+            "payload": json.dumps(payload)
         }
         try:
             print(f"Sending: {json.dumps(request)}")
@@ -261,7 +261,7 @@ def main():
     """
     client = KerberosClient()
     client.register()
-    # client.send_message_for_print("Message!")
+    client.send_message_for_print("Message!")
 
 
 # Todo: support for multiple clients
