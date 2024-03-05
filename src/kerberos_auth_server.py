@@ -141,7 +141,13 @@ class KerberosAuthServer:
         """
         try:
             if request["name"] in self.get_clients_names():
-                return "Error, Name already exists!"
+                response = "Error, Name already exists!"
+                return {
+                    "code": 1601,
+                    "version": self.version,
+                    "payloadSize": len(response),
+                    "payload": response
+                }
             else:
                 client_id = create_uuid()
                 password_hash = create_password_sha(request["password"])
