@@ -174,17 +174,18 @@ class KerberosClient:
             print(f"Caught Exception: {str(e)}")
             username = input("Enter username: ")
             password = input("Enter password: ")
-            request = {
-                "header": {
-                    "clientID": "clientID",  # the server will ignore this field
-                    "version": self.version,
-                    "code": 1024,
-                    "payloadSize": len(username) + len(password)
-                },
-                "payload": {
+            payload = {
                     "name": username,
                     "password": password
                 }
+            request = {
+                "header": {
+                    "clientID": "client_id12345678",  # the server will ignore this field
+                    "version": self.version,
+                    "code": 1024,
+                    "payloadSize": len(json.dumps(payload))
+                },
+                "payload": json.dumps(payload)
             }
             response = self.send_message_to_server(request)
             uuid = json.loads(response)["payload"]
@@ -193,6 +194,7 @@ class KerberosClient:
             self.__client_id__(uuid)
             # TODO: better error handling on this, finally gets a lot of errors in this flow
         finally:
+            # TODO: fix UnboundLocalError: local variable 'uuid' referenced before assignment
             if username and uuid:
                 with open(CLIENT_FILE, 'w') as client_file:
                     client_file.writelines([username + "\n", uuid])

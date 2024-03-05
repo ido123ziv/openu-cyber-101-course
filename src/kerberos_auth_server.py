@@ -162,7 +162,7 @@ class KerberosAuthServer:
                 }
 
         except Exception as e:
-            print(str(e))
+            print("register error: \n" + str(e))
             return "Error! can't add user because of {}".format(str(e))
 
     def receive_client_request(self, client_socket, addr):
@@ -174,7 +174,7 @@ class KerberosAuthServer:
                 raise ValueError
 
             # Unpack the header fields using struct
-            client_id, version, code, payload_size = struct.unpack('<16sBB I', header_data)
+            client_id, version, code, payload_size = struct.unpack('<16sBH I', header_data)
             payload_data = client_socket.recv(payload_size)
             if len(payload_data) != payload_size:
                 print("Payload size didn't match payload, Aborting!.")
@@ -182,12 +182,12 @@ class KerberosAuthServer:
 
             request = {
                 "header": {
-                    "clientID": client_id,
+                    "clientID": client_id.decode("utf-8"),
                     "version": version,
                     "code": code,
                     "payloadSize": payload_size
                 },
-                "payload": payload_data
+                "payload": payload_data.decode("utf-8")
             }
             response = self.handle_client_request(request)
             client_socket.send(json.dumps(response).encode("utf-8"))
@@ -224,11 +224,16 @@ class KerberosAuthServer:
             if not request:
                 raise NameError("request is empty!")
             # Todo: print as json, add error handeling for json
-            print(request)
+            print(f"handle_client_request: \n{request}")
             code = request["header"]["code"]
             if code == 1024:
-                return self.register(request["payload"])
+                try:
+                    payload = json.loads(request["payload"])
+                    return self.register(payload)
+                except Exception as e:
+                    raise ValueError("Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
             if code == 1027:
+                # TODO: separate function
                 print("Client requested key")
                 client_id = request["header"]["clientID"]
                 nonce = request["payload"]["nonce"]
@@ -264,7 +269,7 @@ class KerberosAuthServer:
             print(f"Got Key Error on {e}")
             exit(1)
         except Exception as e:
-            print(str(e))
+            print("handle_client_request error: \n" + str(e))
             exit(1)
 
     def register_user(self):
@@ -369,7 +374,7 @@ def load_clients():
                 })
             return clients
     except Exception as e:
-        print(str(e))
+        print("load_clients error: \n" + str(e))
         print("No clients found")
         return []
 
@@ -389,7 +394,7 @@ def add_client_to_file(clients):
                 clients_file.write(" PasswordHash: " + client.get("passwordHash"))
                 clients_file.write(" LastSeen: " + client.get("lastSeen") + "\n")
     except Exception as e:
-        print(str(e))
+        print("add_clients_to_file error: \n" + str(e))
         print("Couldn't add client, defaulting to previous state")
         with open(CLIENT_FILE, 'w') as clients_file:
             if backup_client is not None or backup_client != []:
