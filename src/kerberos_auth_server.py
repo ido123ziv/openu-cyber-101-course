@@ -3,12 +3,12 @@ import struct
 from datetime import datetime, timedelta
 
 import socket
-# TODO: add struct usage
 import threading
 from shared_server import *
 import base64
 from Crypto.Cipher import AES
 from uuid import uuid1
+import ast
 CLIENT_FILE = "clients.info"
 # todo use multiple message services for now leave it
 SERVERS_FILE = "servers.info"
@@ -109,9 +109,12 @@ class KerberosAuthServer:
         print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
         aes_key = AES.new(bytes_key, AES.MODE_CBC, iv=create_iv())
         ticket_aes_key = AES.new(base64.b64decode(self.message_server.get('key')), AES.MODE_CBC, iv=create_iv())
+        print("lala")
         encrypted_ticket_key = encrypt_aes(ticket_aes_key, nonce, bytes_key)
+        print("lalalalalala")
         creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
+        print("lalala")
         encrypted_time = encrypt_aes(ticket_aes_key, nonce, expiration_time.encode())
         # aes_key = AES.new(get_random_bytes(32), AES.MODE_CBC, iv=get_random_bytes(16))
         ticket_payload = self.generate_ticket(client_id, server_id, encrypted_ticket_key, creation_time, encrypted_time)
@@ -175,8 +178,7 @@ class KerberosAuthServer:
     def handle_key_request(self, request):
         recived_payload = json.loads(request["payload"])
         client_id = request["header"]["clientID"]
-        nonce = recived_payload["nonce"]
-        print("here")
+        nonce = ast.literal_eval(recived_payload["nonce"])
         response = self.generate_session_key(client_id,
                                              self.message_server.get("uuid"), nonce)
         print("Created session key!")

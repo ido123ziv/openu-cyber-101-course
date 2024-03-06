@@ -8,17 +8,6 @@ import os
 os.chdir("../src")
 
 
-def test_receive_client_request():
-    """
-    recieve request from client and parse it
-    :return: parsed dict with the request
-    """
-    # temp
-    client = name_generator()
-    print(client)
-    return client
-
-
 @pytest.fixture
 def server():
     return KerberosAuthServer()
@@ -27,7 +16,13 @@ def server():
 # def test_main(server):
 #     server.start_server()
 def test_register_user(server):
-    client_name_for_request = test_receive_client_request()
+    """
+    test for auth server that generates a client
+    :param server:
+    :return:
+    """
+    client_name_for_request = name_generator()
+    print(client_name_for_request)
     if client_name_for_request:
         client_request = {
             "header": {
@@ -37,15 +32,23 @@ def test_register_user(server):
             "payload": json.dumps(client_name_for_request)
         }
         response = server.handle_client_request(client_request)
-        print(f"Server reply: {response}")
-        return response
-    return "Error"
+        if not response:
+            assert False
+        try:
+            print(f"Server reply: {json.dumps(response)}")
+        except Exception as e:
+            print(str(e))
+            print(f"Server reply: {response}")
+        assert True
+    else:
+        assert False
 
 
 def register_multiple_users(server):
     count = 0
-    while "Error" in response and count < 10:
-        response = test_register_user(server)
+    while count < 10:
+        test_register_user(server)
+        count += 1
     assert count < 10
 
 
