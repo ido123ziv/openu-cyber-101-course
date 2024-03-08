@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import socket
 import threading
 from shared_server import *
-import base64
+from base64 import b64encode, b64decode
 from Crypto.Cipher import AES
 from uuid import uuid1
 import ast
@@ -115,40 +115,46 @@ class KerberosAuthServer:
         except Exception as e:
             print("Client is not registered! " + str(e))
             raise ValueError("Client Not Registered")
+
         key = client.get("passwordHash")
         bytes_key = str(key).encode()[32:]
         print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
-        aes_key = AES.new(bytes_key, AES.MODE_CBC, iv=create_iv())
-        ticket_aes_key = AES.new(base64.b64decode(self.message_server.get('key')), AES.MODE_CBC, iv=create_iv())
-        print("lala")
-        encrypted_ticket_key = encrypt_aes(ticket_aes_key, nonce, bytes_key)
-        print("lalalalalala")
+
+        session_key = create_random_byte_key(16)
+        client_key = encrypt_ng(bytes_key, session_key, nonce)
+
         creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
-        print("lalala")
-        encrypted_time = encrypt_aes(ticket_aes_key, nonce, expiration_time.encode())
-        # aes_key = AES.new(get_random_bytes(32), AES.MODE_CBC, iv=get_random_bytes(16))
-        ticket_payload = self.generate_ticket(client_id, server_id, encrypted_ticket_key, creation_time, encrypted_time)
+
+        ticket_key = encrypt_ng(session_key, session_key, expiration_time.encode())
+
+        ticket = self.generate_ticket(client_id, server_id,  creation_time)
+        ticket["ticket_iv"] = ticket_key["iv"]
+        ticket["aes_key"] = ticket_key["encrypted_data"]
+        ticket["expiration_time"] = ticket_key["time"]
+
         return {
-            "key": encrypt_aes(aes_key, nonce, bytes_key),
-            "nonce": encrypt_aes(aes_key, nonce, nonce),
-            "ticket": encrypt_aes(aes_key, nonce, ticket_payload.encode())
+            "encrypted_key_iv": client_key["iv"],
+            "nonce": client_key["nonce"],
+            "aes_key": client_key["encrypted_data"],
+            "ticket": ticket
         }
 
-    def generate_ticket(self, client_id, server_id, key, creation_time, expiration_time):
+    def generate_ticket(self, client_id, server_id, creation_time):
         """
         generate tgt from given key
-        :param expiration_time:
         :param creation_time:
         :param server_id: message server id
-        :param key: AES Key used for encryption
         :param client_id: client initiated request
         :return: tgt
         """
-        # ticket = f"{client_id}:{service_id}:{base64.b64encode(self.generate_salt()).decode()}"
-        ticket = f"{self.version}|{client_id}|{server_id}"
-        ticket += f"{creation_time}|{base64.b64encode(key).decode()}|{expiration_time}"
-        return ticket
+        return {
+            # TODO: change to message server version
+            "version": self.version,
+            "client_id": client_id,
+            "server_id": server_id,
+            "creation_timestamp": creation_time
+        }
 
     # TODO: add to register flow to check sha for registered users.
     def register(self, request):
@@ -158,12 +164,16 @@ class KerberosAuthServer:
         """
         try:
             if request["name"] in self.get_clients_names():
-                response = "Error, Name already exists!"
+                password_hash = create_password_sha(request["password"])
+                client_index = self.get_clients_names().index(request["name"])
+                client = self.clients[client_index]
+                if password_hash != client["passwordHash"]:
+                    raise ValueError("Client Already Registered, password incorrect.")
                 return {
-                    "code": 1601,
+                    "code": 1600,
                     "version": self.version,
-                    "payloadSize": len(response),
-                    "payload": response
+                    "payloadSize": len(str(client["clientID"])),
+                    "payload": client["clientID"]
                 }
             else:
                 client_id = str(create_uuid())[:16]
@@ -186,7 +196,13 @@ class KerberosAuthServer:
 
         except Exception as e:
             print("register error: \n" + str(e))
-            return "Error! can't add user because of {}".format(str(e))
+            error_response = "Error! can't register user because of {}".format(str(e))
+            return {
+                "code": 1601,
+                "version": self.version,
+                "payloadSize": len(error_response),
+                "payload": error_response
+            }
 
     def handle_key_request(self, request):
         recived_payload = json.loads(request["payload"])
@@ -197,12 +213,11 @@ class KerberosAuthServer:
                                              self.message_server.get("uuid"), nonce)
         print("Created session key!")
         # TODO: why ticket is 322 bytes and not 99?
-        print(response)
-        # TODO: check the encrypted key iv thing
+        print(f"generate_session_key: {response}")
         encrypted_key = {
-            "aes_key": response.get('key'),
+            "aes_key": response.get('aes_key'),
             "nonce": response.get('nonce'),
-            "encrypted_key_iv": create_iv()
+            "encrypted_key_iv": response.get('encrypted_key_iv')
         }
         payload = {
             "encrypted_key": encrypted_key,
@@ -257,14 +272,14 @@ class KerberosAuthServer:
         :param request: parsed dict of info
         :return: error code
         """
-        # TODO: check if payload size matches the payload size header
-        # TODO: check if version matches
         try:
+
             if not request:
                 raise NameError("request is empty!")
             if "error" in request["header"]["clientID"].lower():
                 raise ValueError("Invalid ClientId")
-            # Todo: print as json, add error handeling for json
+            if request["header"]["version"] != self.version:
+                raise ValueError("Server version don't match client version")
             print(f"handle_client_request: \n{request}")
             code = request["header"]["code"]
             try:
@@ -312,11 +327,6 @@ class KerberosAuthServer:
         finally:
             server.close()
 
-        # TODO: Use infinite loops again
-        # while True:
-        #     client_request = self.receive_client_request()
-        #     if client_request:
-        #         pass
         # TODO add support for multi servers using threads
         # thread = threading.Thread(target=self.handle_client_request, args=(client_request,))
         # thread.start()
@@ -375,6 +385,7 @@ def add_client_to_file(clients):
                 clients_file.writelines(backup_client)
 
 
+# TODO: remove
 def test_auth_server_functionality(server):
     print("------------------------------------------")
     # client_id = "55333695485370013835749364635449140321"
