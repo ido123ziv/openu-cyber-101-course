@@ -211,7 +211,7 @@ class KerberosClient:
         try:
             response = self.send_message_to_server(request)
             response_data = json.loads(response)
-            if "error" in response_data["payload"].lower() or response_data["header"]["code"] == 1601:
+            if "error" in response_data["payload"].lower() or response_data["code"] == 1601:
                 raise ValueError("Server error: " + response_data["payload"])
             self.create_sha256(password)
         except json.JSONDecodeError:

@@ -121,12 +121,12 @@ class KerberosAuthServer:
         print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
 
         session_key = create_random_byte_key(16)
-        client_key = encrypt_ng(bytes_key, session_key, nonce)
+        client_key = encrypt_ng(bytes_key, session_key, nonce=nonce)
 
         creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
 
-        ticket_key = encrypt_ng(session_key, session_key, expiration_time.encode())
+        ticket_key = encrypt_ng(session_key, session_key, time=expiration_time.encode())
 
         ticket = self.generate_ticket(client_id, server_id,  creation_time)
         ticket["ticket_iv"] = ticket_key["iv"]
