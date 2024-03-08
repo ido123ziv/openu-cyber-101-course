@@ -10,9 +10,9 @@ from Crypto.Cipher import AES
 from uuid import uuid1
 import ast
 CLIENT_FILE = "clients.info"
-# todo use multiple message services for now leave it
 SERVERS_FILE = "servers.info"
 SERVER_IP = "127.0.0.1"
+
 
 def create_uuid():
     """creates uuid for each request, represent a client"""
@@ -51,6 +51,13 @@ class KerberosAuthServer:
         :return: a list of clients
         """
         return self._clients
+
+    def __client_ids__(self):
+        """
+
+        :return: a list with all client ids
+        """
+        return [x["clientID"] for x in self.clients]
 
     @property
     def port(self):
@@ -101,7 +108,7 @@ class KerberosAuthServer:
         :param client_id: client id of user initiated the request
         :return: a tuple of AES Key and ticket encrypted
         """
-        clients_ids = [x["clientID"] for x in self.clients]
+        clients_ids = self.__client_ids__()
         client_index = clients_ids.index(client_id)
         client = self.clients[client_index]
         key = client.get("passwordHash")
@@ -119,7 +126,8 @@ class KerberosAuthServer:
         # aes_key = AES.new(get_random_bytes(32), AES.MODE_CBC, iv=get_random_bytes(16))
         ticket_payload = self.generate_ticket(client_id, server_id, encrypted_ticket_key, creation_time, encrypted_time)
         return {
-            "key": aes_key,
+            "key": encrypt_aes(aes_key, nonce, bytes_key),
+            "nonce": encrypt_aes(aes_key, nonce, nonce),
             "ticket": encrypt_aes(aes_key, nonce, ticket_payload.encode())
         }
 
@@ -153,11 +161,11 @@ class KerberosAuthServer:
                     "payload": response
                 }
             else:
-                client_id = create_uuid()
+                client_id = str(create_uuid())[:16]
                 password_hash = create_password_sha(request["password"])
                 self.clients.append(
                     {
-                        "clientID": str(client_id),
+                        "clientID": client_id,
                         "name": request["name"],
                         "passwordHash": str(password_hash),
                         "lastSeen": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -168,7 +176,7 @@ class KerberosAuthServer:
                     "code": 1600,
                     "version": self.version,
                     "payloadSize": len(str(client_id)),
-                    "payload": str(client_id)
+                    "payload": client_id
                 }
 
         except Exception as e:
@@ -179,15 +187,17 @@ class KerberosAuthServer:
         recived_payload = json.loads(request["payload"])
         client_id = request["header"]["clientID"]
         nonce = ast.literal_eval(recived_payload["nonce"])
+        print("lala")
         response = self.generate_session_key(client_id,
                                              self.message_server.get("uuid"), nonce)
         print("Created session key!")
+        # TODO: why ticket is 322 bytes and not 99?
         print(response)
         # TODO: check the encrypted key iv thing
         encrypted_key = {
-            "AES Key": encrypt_aes(response.get('key'), nonce, nonce),
-            "Nonce": encrypt_aes(response.get('key'), nonce, nonce),
-            "Encrypted Key IV": create_iv()
+            "aes_key": response.get('key'),
+            "nonce": response.get('nonce'),
+            "encrypted_key_iv": create_iv()
         }
         payload = {
             "encrypted_key": encrypted_key,
@@ -228,7 +238,8 @@ class KerberosAuthServer:
                 "payload": payload_data.decode("utf-8")
             }
             response = self.handle_client_request(request)
-            client_socket.send(json.dumps(response).encode("utf-8"))
+            print(f"Server will now respond with: {response}")
+            client_socket.send(json.dumps(response, default=str).encode("utf-8"))
         except Exception as e:
             print(f"Error when handling client: {e}")
         finally:
@@ -357,6 +368,28 @@ def add_client_to_file(clients):
                 clients_file.writelines(backup_client)
 
 
+def test_auth_server_functionality(server):
+    print("------------------------------------------")
+    # client_id = "55333695485370013835749364635449140321"
+    client_id = "1948712530784178"
+    payload = {
+            "serverID": "64f3f63985f04beb81a0e43321880182",
+            "nonce": str(create_nonce())
+        }
+    client_request = {
+        "header": {
+            "code": 1027,  # register code
+            "version": 24,
+            "clientID": client_id
+        },
+        "payload": json.dumps(payload)
+    }
+    client_request["header"]["payloadSize"] = len(json.dumps(client_request["payload"]))
+    print(json.dumps(client_request, indent=4, default=str))
+    response = server.handle_client_request(client_request)
+    print(f"Server reply: {response}")
+
+
 def main():
     """
     main function
@@ -369,6 +402,7 @@ def main():
     print(f"message_sever in use: {server.message_server}")
     print(f"my messaging servers {server.servers}")
     server.start_server()
+    # test_auth_server_functionality(server)
 
 
 if __name__ == "__main__":
