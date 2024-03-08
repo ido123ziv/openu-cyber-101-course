@@ -175,7 +175,7 @@ class KerberosClient:
             self.__client_id__(uuid)
             if self.sha256 is None:
                 password = input("Please retype your password: ")
-                self.create_sha256(password)
+                self.validate_existing_user(uuid, username, password)
         except (FileNotFoundError, IndexError) as e:
             print(f"Unable to find client information or invalid format in '{CLIENT_FILE}': {e}")
             # Prompting for user input if there is an issue with the client file
@@ -186,6 +186,40 @@ class KerberosClient:
             print(f"Caught Exception: {str(e)}")
         else:
             print(f"Successfully registered with uuid: {self.client_id}")
+
+    def validate_existing_user(self, client_id: str, username: str, password: str):
+        """
+
+        :param client_id:
+        :param username:
+        :param password:
+        :return:
+        """
+        payload = {
+            "name": username,
+            "password": password
+        }
+        request = {
+            "header": {
+                "clientID": client_id,
+                "version": self.version,
+                "code": 1024,
+                "payloadSize": len(json.dumps(payload))
+            },
+            "payload": json.dumps(payload)
+        }
+        try:
+            response = self.send_message_to_server(request)
+            response_data = json.loads(response)
+            if "error" in response_data["payload"].lower() or response_data["header"]["code"] == 1601:
+                raise ValueError("Server error: " + response_data["payload"])
+            self.create_sha256(password)
+        except json.JSONDecodeError:
+            print("Not valid server response")
+        except ValueError as e:
+            print("Caught Value Error when validating password: " + str(e))
+        except Exception as e:
+            print(f"Unexpected registration error! " + str(e))
 
     def attempt_registration(self, username: str, password: str):
         """
@@ -223,7 +257,6 @@ class KerberosClient:
             print("Not valid server response")
         except ValueError as e:
             print("Caught Value Error when registering to server: " + str(e))
-            # TODO: handle case of same username returning
         except Exception as e:
             print(f"registration error! " + str(e))
 
