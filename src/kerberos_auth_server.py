@@ -388,7 +388,6 @@ def add_client_to_file(clients):
 # TODO: remove
 def test_auth_server_functionality(server):
     print("------------------------------------------")
-    # client_id = "55333695485370013835749364635449140321"
     client_id = "1948712530784178"
     payload = {
             "serverID": "64f3f63985f04beb81a0e43321880182",

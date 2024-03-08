@@ -114,6 +114,26 @@ def encrypt_ng(key, data, nonce=None, time=None):
     return encrypted_struct
 
 
+def decrypt_ng(key, data, iv):
+    """
+
+    :param key:
+    :param data:
+    :param iv:
+    :return:
+    """
+    try:
+        parse_iv = b64decode(iv)
+        parse_data = b64decode(data)
+        cipher = AES.new(key, AES.MODE_CBC, parse_iv)
+        pt = unpad(cipher.decrypt(parse_data), AES.block_size)
+        print("The message was: ", pt)
+        return pt
+    except (ValueError, KeyError) as e:
+        print("Got Error, Incorrect decryption")
+        return e
+
+
 def decrypt_aes(encrypted_data, key):
     """
     decrypts a given encrypted data using aes key.

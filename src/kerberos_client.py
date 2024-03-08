@@ -218,6 +218,7 @@ class KerberosClient:
             print("Not valid server response")
         except ValueError as e:
             print("Caught Value Error when validating password: " + str(e))
+            # TODO: Unexpected registration error! 'header'
         except Exception as e:
             print(f"Unexpected registration error! " + str(e))
 
@@ -265,15 +266,10 @@ class KerberosClient:
         receives an aes key and a ticket to a message server.
         decrypts the key and saves it along with the ticket for future use.
         """
-        # nonce = create_nonce()
-        # encrypted_key, ticket = authserver.generate_session_key(self.uuid, SERVER_ID, nonce)
-        # try:
-            # decrypted_key = decrypt_aes(encrypted_key, self.sha256)
-            # self.aes_key = decrypted_key
-            # self.ticket = ticket
         try:
             client_info = self.get_client_info()
             uuid = client_info["uuid"]
+            # nonce = create_nonce()
             nonce = str(create_nonce())
             payload = {
                 "serverID": SERVER_ID,
@@ -292,13 +288,15 @@ class KerberosClient:
             response_data = json.loads(response)["payload"]
             encrypted_key = response_data["encrypted_key"]
             ticket = response_data["ticket"]
-            # encrypted_key, ticket = authserver.generate_session_key(request)
             try:
-                decrypted_key = str(decrypt_aes(ast.literal_eval(encrypted_key["aes_key"]), self.sha256))
+                decrypted_key = decrypt_ng(self.sha256, encrypted_key["aes_key"], encrypted_key["encrypted_key_iv"])
+                if isinstance(decrypted_key, Exception):  # Checks if an error occurred while getting client info
+                    raise client_info
                 self._aes_key = decrypted_key
-                self._ticket = ast.literal_eval(ticket)
+                # self._ticket = ast.literal_eval(ticket)
+                self._ticket = ticket
             except ValueError as e:
-                print(e)
+                print("Value Error: " + str(e))
                 print(ERROR_MESSAGE)
         except json.JSONDecodeError as e:
             print("Response from server is not valid \n" + ERROR_MESSAGE)
