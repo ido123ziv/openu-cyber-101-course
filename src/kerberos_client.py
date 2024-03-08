@@ -210,8 +210,8 @@ class KerberosClient:
         try:
             response = self.send_message_to_server(request)
             response_data = json.loads(response)
-            if "error" in response_data:
-                raise ValueError("Server error: " + response_data["error"])
+            if "error" in response_data["payload"].lower():
+                raise ValueError("Server error: " + response_data["payload"])
             if len(response_data["payload"]) < 16:
                 raise ValueError("Server error, invalid client id")
             self.create_sha256(password)
@@ -223,6 +223,7 @@ class KerberosClient:
             print("Not valid server response")
         except ValueError as e:
             print("Caught Value Error when registering to server: " + str(e))
+            # TODO: handle case of same username returning
         except Exception as e:
             print(f"registration error! " + str(e))
 

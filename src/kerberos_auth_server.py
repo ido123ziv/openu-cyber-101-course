@@ -108,9 +108,13 @@ class KerberosAuthServer:
         :param client_id: client id of user initiated the request
         :return: a tuple of AES Key and ticket encrypted
         """
-        clients_ids = self.__client_ids__()
-        client_index = clients_ids.index(client_id)
-        client = self.clients[client_index]
+        try:
+            clients_ids = self.__client_ids__()
+            client_index = clients_ids.index(client_id)
+            client = self.clients[client_index]
+        except Exception as e:
+            print("Client is not registered! " + str(e))
+            raise ValueError("Client Not Registered")
         key = client.get("passwordHash")
         bytes_key = str(key).encode()[32:]
         print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
@@ -146,6 +150,7 @@ class KerberosAuthServer:
         ticket += f"{creation_time}|{base64.b64encode(key).decode()}|{expiration_time}"
         return ticket
 
+    # TODO: add to register flow to check sha for registered users.
     def register(self, request):
         """
         These methods handle the registration of a client to the server
@@ -257,6 +262,8 @@ class KerberosAuthServer:
         try:
             if not request:
                 raise NameError("request is empty!")
+            if "error" in request["header"]["clientID"].lower():
+                raise ValueError("Invalid ClientId")
             # Todo: print as json, add error handeling for json
             print(f"handle_client_request: \n{request}")
             code = request["header"]["code"]
