@@ -26,8 +26,10 @@ def test_register_user(server):
     if client_name_for_request:
         client_request = {
             "header": {
+                "clientID": "client_id87654321",
                 "code": 1024,  # register code
-                "version": 24
+                "version": 24,
+                "payloadSize": len(json.dumps(client_name_for_request))
             },
             "payload": json.dumps(client_name_for_request)
         }

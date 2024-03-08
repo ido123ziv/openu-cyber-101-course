@@ -385,28 +385,6 @@ def add_client_to_file(clients):
                 clients_file.writelines(backup_client)
 
 
-# TODO: remove
-def test_auth_server_functionality(server):
-    print("------------------------------------------")
-    client_id = "1948712530784178"
-    payload = {
-            "serverID": "64f3f63985f04beb81a0e43321880182",
-            "nonce": str(create_nonce())
-        }
-    client_request = {
-        "header": {
-            "code": 1027,  # register code
-            "version": 24,
-            "clientID": client_id
-        },
-        "payload": json.dumps(payload)
-    }
-    client_request["header"]["payloadSize"] = len(json.dumps(client_request["payload"]))
-    print(json.dumps(client_request, indent=4, default=str))
-    response = server.handle_client_request(client_request)
-    print(f"Server reply: {response}")
-
-
 def main():
     """
     main function
@@ -419,7 +397,6 @@ def main():
     print(f"message_sever in use: {server.message_server}")
     print(f"my messaging servers {server.servers}")
     server.start_server()
-    # test_auth_server_functionality(server)
 
 
 if __name__ == "__main__":
