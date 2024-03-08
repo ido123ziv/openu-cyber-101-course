@@ -95,7 +95,7 @@ def decrypt_aes(encrypted_data, key):
     """
     data = base64.b64decode(encrypted_data)
     iv, ciphertext = data[:16], data[16:]
-    cipher = AES.new(key, iv, AES.MODE_CBC)
+    cipher = AES.new(key,  AES.MODE_CBC, iv)
     decrypted_data = unpad(cipher.decrypt(ciphertext), AES.block_size)
     return decrypted_data
 

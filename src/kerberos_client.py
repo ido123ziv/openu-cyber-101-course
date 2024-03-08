@@ -142,7 +142,8 @@ class KerberosClient:
         :param password:
         :return:
         """
-        self._sha256 = create_password_sha(password)
+
+        self._sha256 = str(create_password_sha(password)).encode()[32:]
 
     def get_client_info(self):
         """
