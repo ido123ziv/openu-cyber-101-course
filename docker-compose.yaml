@@ -1,0 +1,27 @@
+version: '3.8'
+services:
+  kerberos-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "main.py", "--server"]
+    volumes:
+      - .:/app
+    networks:
+      - kerberos-network
+
+  kerberos-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "main.py", "--client"]
+    volumes:
+      - .:/app
+    depends_on:
+      - kerberos-server
+    networks:
+      - kerberos-network
+
+networks:
+  kerberos-network:
+    driver: bridge
