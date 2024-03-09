@@ -6,8 +6,7 @@ from shared_server import *
 
 CLIENT_FILE = "me.info"
 ERROR_MESSAGE = "Server responded with an error."
-# TODO use multiple message servers for now leave it
-SERVER_ID = "hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711"
+SERVER_ID = "hmd7dkd8r7dje711"
 
 class KerberosClient:
     """    
@@ -15,9 +14,9 @@ class KerberosClient:
     """
     def __init__(self):
         self._version = 24
-        self._aes_key = None
-        self._ticket = None
-        self._sha256 = None
+        self._aes_key = None # a symetric key between client and message server
+        self._ticket = None 
+        self._sha256 = None # a symetric key between client and auth server
 
 
     @property
@@ -60,19 +59,18 @@ class KerberosClient:
         """
         reads client's name and uuid from 'me.info' file.
         :return: a dict containing the name and the uuid. 
-        raises FileNotFoundError if the file does not exist.
         """
         try:
             with open(CLIENT_FILE, 'r') as client_file:
                 data = client_file.readlines()
                 return {"username": data[0], "uuid": data[1]}
-        except FileNotFoundError as e:
+        except Exception as e:
             return e
 
 
     def create_authenticator(self, uuid):
         """
-        creates an authenticator using an AES key.
+        creates an authenticator for message server using an AES symetric key.
         :param uuid: client unique id.
         :return: the authenticator that was created.
         """
@@ -94,10 +92,10 @@ class KerberosClient:
         }, authenticatorSize
 
 
-    def register(self, username: str):
+    def register(self):
         """
         sends a register request to the auth server.
-        :param username: string representing a username.
+        when the client's info ('me.info') doesn't exist, fetch it as input.
         """
         try:
             client_info = self.get_client_info()
@@ -122,14 +120,22 @@ class KerberosClient:
             }
             uuid = authserver.register(request)["Payload"]
             self.sha256 = create_password_sha(password)
-        finally:
+
             with open(CLIENT_FILE, 'w') as client_file:
                 client_file.writelines([username, uuid])
+            
+            print("Client registered successfully.")
+            print(f"Client info: {self.get_client_info()}")
+        except Exception as e:
+            print(e)
+            print("Unsuccessful registration.")
+            exit(1)
 
 
     def receive_aes_key(self):
         """
-        receives an aes key and a ticket to a message server.
+        receives a symetric key between client and message server,
+        and a ticket for the message server.
         decrypts the key and saves it along with the ticket for future use.
         """
         try:
@@ -149,50 +155,46 @@ class KerberosClient:
                 }
             }
             encrypted_key, ticket = authserver.generate_session_key(request)
-            try:
-                decrypted_key = str(decrypt_aes(encrypted_key, self.sha256))
-                self.aes_key = decrypted_key
-                self.ticket = ticket
-            except ValueError as e:
-                print(e)
-                print(ERROR_MESSAGE)
-        except FileNotFoundError:
-            print("File 'me.info' was not found.")
+            
+            decrypted_key = str(decrypt_aes(encrypted_key, self.sha256))
+            self.aes_key = decrypted_key
+            self.ticket = ticket
+        except Exception as e:
+            print(e)
+            print(ERROR_MESSAGE)
             exit(1)
             
 
-    def send_aes_key(self, aes_key):
+    def send_aes_key(self):
         """
         sends an authenticator and a ticket to the message server.
-        :param aes_key: AES Symmetric Key.
         """
         try:
             uuid = self.get_client_info()["uuid"]
             authenticator, authenticatorSize = self.create_authenticator(uuid)
-            ticket = self.ticket
             request = {
                 "header": {
                     "clientID": uuid,
                     "version": self.version,
                     "code": 1028,
-                    "payloadSize": authenticatorSize + len(ticket)
+                    "payloadSize": authenticatorSize + len(self.ticket)
                 },
                 "payload":{
                     "authenticator": authenticator,
-                    "ticket": ticket
+                    "ticket": self.ticket
                 }
             }
-            msgserver.receive_aes_key(request)
-        except FileNotFoundError:
-            print("File 'me.info' was not found.")
+            msgserver.get_and_decrypt_key(request)
+        except Exception as e:
+            print(e)
             exit(1)
 
 
-    def send_message(self, message: str):
+    def send_message(self):
         """
-        encrypts a given message and sends it to the message server.
-        :param message: a message to encrypt.
+        encrypts the input message and sends it to the message server.
         """
+        message = input("Type a message for the server: ")
         try:
             client_info = self.get_client_info()
             uuid = client_info["uuid"]
@@ -214,6 +216,23 @@ class KerberosClient:
                 }
             }
             msgserver.receive_client_request(request)
-        except FileNotFoundError:
-            print("File 'me.info' was not found.")
+
+            print("Message sent.")
+        except Exception as e:
+            print(e)
             exit(1)
+
+
+def main():
+    client = KerberosClient()
+    print(f"I'm a client!")
+    print(f"my version is {client.version}")
+    client.register()
+    client.receive_aes_key()
+    client.send_aes_key()
+    while True:
+        client.send_message()
+
+
+if __name__ == "__main__":
+    main()
