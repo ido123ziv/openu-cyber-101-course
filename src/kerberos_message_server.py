@@ -1,4 +1,5 @@
 import json
+import struct
 import threading
 from shared_server import *
 import socket
@@ -68,7 +69,7 @@ class KerberosMessageServer:
             self._lock = threading.Lock()
             self._clients = {}
         except Exception as e:
-            print(str(e))
+            print("Init error: " + str(e))
             default_error()
 
     @property
@@ -137,7 +138,7 @@ class KerberosMessageServer:
             })
             return dict(Code=1604)
         except Exception as e:
-            print(str(e))
+            print("get_and_decrypt_key error: " + str(e))
             return default_error()
 
     def find_client_by_iv(self, message_iv):
@@ -175,13 +176,33 @@ class KerberosMessageServer:
             print(message)
             return dict(Code=1605)
         except Exception as e:
-            print(str(e))
+            print("print_message error: " + str(e))
             return default_error()
 
     def receive_client_request(self, client_socket, addr):
         try:
-            request = client_socket.recv(1024).decode("utf-8")
-            response = self.handle_client_request(json.loads(request))
+            header_data = client_socket.recv(23)
+            if len(header_data) != 23:
+                print("Header size didn't match constraints.")
+                raise ValueError
+
+            # Unpack the header fields using struct
+            client_id, version, code, payload_size = struct.unpack('<16sBH I', header_data)
+            payload_data = client_socket.recv(payload_size)
+            if len(payload_data) != payload_size:
+                print("Payload size didn't match payload, Aborting!.")
+                raise ValueError
+
+            request = {
+                "header": {
+                    "clientID": client_id.decode("utf-8"),
+                    "version": version,
+                    "code": code,
+                    "payloadSize": payload_size
+                },
+                "payload": payload_data.decode("utf-8")
+            }
+            response = self.handle_client_request(request)
             client_socket.send(json.dumps(response).encode("utf-8"))
         except Exception as e:
             print(f"Error when handling client: {e}")
@@ -218,11 +239,15 @@ class KerberosMessageServer:
             if code == 1028:
                 return self.get_and_decrypt_key(request["payload"])
             elif code == 1029:
-                return self.print_message(request["payload"])
+                try:
+                    payload = json.loads(request["payload"])
+                    return self.print_message(payload)
+                except Exception as e:
+                    raise ValueError("Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
             else:
                 raise ValueError("Not Valid request code")
         except Exception as e:
-            print(str(e))
+            print("handle_client_request error: " + str(e))
             return {"code": default_error()}
 
     def start_server(self):

@@ -1,6 +1,6 @@
 import json
+import struct
 
-# from kerberos_auth_server import KerberosAuthServer as authserver
 from shared_server import *
 import socket
 
@@ -13,9 +13,9 @@ SERVER_ID = "hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711"
 
 def read_servers_info():
     """
-
-    :return:
-    """
+    reads from {} the servers information and stores to memory
+    :return: a dict with both auth and messaging servers ip and port
+    """.format(SERVERS_FILE)
     try:
         with open(SERVERS_FILE, 'r') as servers_file:
             servers_details = servers_file.readlines()
@@ -37,10 +37,27 @@ def read_servers_info():
         exit(1)
 
 
+def get_client_info():
+    """
+    :return: load current client from file
+    """
+    try:
+        with open(CLIENT_FILE, 'r') as client_file:
+            data = client_file.readlines()
+            return {"username": data[0].strip(), "uuid": data[1].strip()}
+    except FileNotFoundError as e:
+        print(str(e))
+        return e
+    except IndexError as e:
+        print(str(e))
+        return e
+
+
 class KerberosClient:
     """    
     This class represents a client used by the kerberos protocol.
     """
+
     def __init__(self):
         servers = read_servers_info()
         self._auth_server = servers.get("auth")
@@ -51,12 +68,12 @@ class KerberosClient:
         self._ticket = None
         self._sha256 = None
 
-    def send_message_to_server(self, message: str, server="auth"):
+    def send_message_to_server(self, message: dict, server="auth"):
         """
-
-        :param message:
-        :param server:
-        :return:
+        This method uses the socket interface to interact with the servers, auth server and message server
+        :param message: dict representing the request to server according to the accepted format.
+        :param server: server kind -> default is auth. for message pass server="msg"
+        :return: server's response
         """
 
         if server != "auth":
@@ -65,16 +82,23 @@ class KerberosClient:
         else:
             server_ip = self._auth_server.get("ip")
             server_port = self._auth_server.get("port")
-
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # TODO: better error handeling. If socket can't be open say it
-        client.connect((server_ip, server_port))
         try:
-            client.send(message.encode("utf-8")[:1024])
+
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.connect((server_ip, server_port))
+        except socket.error as e:
+            print("Socket error -> " + str(e))
+            exit(1)
+        try:
+            header_data = struct.pack('<16sBH I',  str.encode(message["header"]["clientID"]), message["header"]["version"], message["header"]["code"], message["header"]["payloadSize"])
+
+            client.send(header_data + message["payload"].encode("utf-8"))
             response = client.recv(1024)
             response = response.decode("utf-8")
             print(f"Received: {response}")
             return response
+        except KeyError as e:
+            print(f"Wrong input of key - {e}")
         except Exception as e:
             print(f"Error: {e}")
         finally:
@@ -84,16 +108,14 @@ class KerberosClient:
     @property
     def client_id(self):
         """
-
-        :return:
+        :return: client id in system
         """
         return self._client_id
 
     def __client_id__(self, uuid):
         """
-
-        :param uuid:
-        :return:
+        :param uuid: server's response new uuid
+        :return: saves uuid to system
         """
         self._client_id = uuid
 
@@ -131,27 +153,11 @@ class KerberosClient:
 
     def create_sha256(self, password):
         """
-
-        :param password:
-        :return:
-        """
-        self._sha256 = create_password_sha(password)
-
-    def get_client_info(self):
+        :param password: client password
+        :return: saves sha of password
         """
 
-        :return:
-        """
-        try:
-            with open(CLIENT_FILE, 'r') as client_file:
-                data = client_file.readlines()
-                return {"username": data[0].strip(), "uuid": data[1].strip()}
-        except FileNotFoundError as e:
-            print(str(e))
-            return e
-        except IndexError as e:
-            print(str(e))
-            return e
+        self._sha256 = str(create_password_sha(password)).encode()[32:]
 
     def register(self):
         """
@@ -159,53 +165,137 @@ class KerberosClient:
         :param username: string representing a username.
         """
         try:
-            # TODO: check if e is an error
-            client_info = self.get_client_info()
+            client_info = get_client_info()
+            if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
+                raise client_info  # Raises the caught exception to handle it in the except block
             username = client_info["username"]
             uuid = client_info["uuid"]
             self.__client_id__(uuid)
-        except Exception as e:
-            print(f"Caught Exception: {str(e)}")
+            if self.sha256 is None:
+                password = input("Please retype your password: ")
+                self.validate_existing_user(uuid, username, password)
+        except (FileNotFoundError, IndexError) as e:
+            print(f"Unable to find client information or invalid format in '{CLIENT_FILE}': {e}")
+            # Prompting for user input if there is an issue with the client file
             username = input("Enter username: ")
             password = input("Enter password: ")
-            request = {
-                "header": {
-                    "clientID": "clientID",  # the server will ignore this field
-                    "version": self.version,
-                    "code": 1024,
-                    "payloadSize": len(username) + len(password)
-                },
-                "payload": {
-                    "name": username,
-                    "password": password
-                }
-            }
-            response = self.send_message_to_server(json.dumps(request))
-            uuid = json.loads(response)["payload"]
-            # uuid = authserver.register(request)["payload"]
+            self.attempt_registration(username, password)
+        except Exception as e:
+            print(f"Caught Exception: {str(e)}")
+        else:
+            print(f"Successfully registered with uuid: {self.client_id}")
+
+    def validate_existing_user(self, client_id: str, username: str, password: str):
+        """
+        Validates if existing user is legit by comparing password sha using auth server
+        :param client_id: stored client id
+        :param username: stored username
+        :param password: new input password
+        :return: saves new sha or execption
+        """
+        payload = {
+            "name": username,
+            "password": password
+        }
+        request = {
+            "header": {
+                "clientID": client_id,
+                "version": self.version,
+                "code": 1024,
+                "payloadSize": len(json.dumps(payload))
+            },
+            "payload": json.dumps(payload)
+        }
+        try:
+            response = self.send_message_to_server(request)
+            response_data = json.loads(response)
+            if "error" in response_data["payload"].lower() or response_data["code"] == 1601:
+                raise ValueError("Server error: " + response_data["payload"])
             self.create_sha256(password)
-            self.__client_id__(uuid)
-            # TODO: better error handling on this, finally gets a lot of errors in this flow
-        finally:
-            if username and uuid:
-                with open(CLIENT_FILE, 'w') as client_file:
-                    client_file.writelines([username+"\n", uuid])
+        except json.JSONDecodeError:
+            print("Not valid server response")
+        except ValueError as e:
+            print("Caught Value Error when validating password: " + str(e))
+        except Exception as e:
+            print(f"Unexpected registration error! " + str(e))
+
+    def attempt_registration(self, username: str, password: str):
+        """
+        Attempts to register the client with the server and handle the response.
+        :param username: new username
+        :param password:
+        :return:
+        """
+        payload = {
+            "name": username,
+            "password": password
+        }
+        request = {
+            "header": {
+                "clientID": "client_id12345678",  # the server will ignore this field
+                "version": self.version,
+                "code": 1024,
+                "payloadSize": len(json.dumps(payload))
+            },
+            "payload": json.dumps(payload)
+        }
+        try:
+            response = self.send_message_to_server(request)
+            response_data = json.loads(response)
+            if "error" in response_data["payload"].lower():
+                raise ValueError("Server error: " + response_data["payload"])
+            if len(response_data["payload"]) < 16:
+                raise ValueError("Server error, invalid client id")
+            self.create_sha256(password)
+            self.__client_id__(response_data["payload"])
+            with open(CLIENT_FILE, 'w') as client_file:
+                client_file.writelines([username + "\n", self.client_id])
+            print("Registration attempt succeeded.")
+        except json.JSONDecodeError:
+            print("Not valid server response")
+        except ValueError as e:
+            print("Caught Value Error when registering to server: " + str(e))
+        except Exception as e:
+            print(f"registration error! " + str(e))
 
     def receive_aes_key(self):
         """
         receives an aes key and a ticket to a message server.
         decrypts the key and saves it along with the ticket for future use.
         """
-        nonce = create_nonce()
-        # encrypted_key, ticket = authserver.generate_session_key(self.uuid, SERVER_ID, nonce)
         try:
-            # decrypted_key = decrypt_aes(encrypted_key, self.sha256)
-            # self.aes_key = decrypted_key
-            # self.ticket = ticket
-            pass
-        except ValueError as e:
-            print(f"Error: {str(e)}")
-            print(ERROR_MESSAGE)
+            # nonce = create_nonce()
+            nonce = str(create_nonce())
+            payload = {
+                "serverID": SERVER_ID,
+                "nonce": nonce
+            }
+            request = {
+                "header": {
+                    "clientID": self.client_id,
+                    "version": self.version,
+                    "code": 1027,
+                },
+                "payload": json.dumps(payload)
+            }
+            request["header"]["payloadSize"] = len(json.dumps(payload))
+            response = self.send_message_to_server(request)
+            response_data = json.loads(response)["payload"]
+            encrypted_key = response_data["encrypted_key"]
+            ticket = response_data["ticket"]
+            try:
+                decrypted_key = decrypt_ng(self.sha256, encrypted_key["aes_key"], encrypted_key["encrypted_key_iv"])
+                if isinstance(decrypted_key, Exception):  # Checks if an error occurred while getting client info
+                    raise decrypted_key
+                self._aes_key = decrypted_key
+                self._ticket = ticket
+            except ValueError as e:
+                print("Value Error: " + str(e))
+                print(ERROR_MESSAGE)
+        except json.JSONDecodeError as e:
+            print("Response from server is not valid \n" + ERROR_MESSAGE)
+        except Exception as e:
+            print("Caught Error: " + str(e))
 
     def send_aes_key(self, aes_key):
         """
@@ -220,7 +310,6 @@ class KerberosClient:
         :param message: a message to encrypt.
         """
         nonce = create_nonce()
-        # encrypted_message = encrypt_aes(self.aes_key, nonce, message)
         encrypted_message = message.strip()
         payload = {
             "messageSize": len(encrypted_message),
@@ -230,16 +319,16 @@ class KerberosClient:
         }
         request = {
             "header": {
-                "clientID": self.client_id,  # the server will ignore this field
+                "clientID": "client_id12345678",  # the server will ignore this field
                 "version": self.version,
                 "code": 1029,
                 "payloadSize": len(json.dumps(payload))
             },
-            "payload": payload
+            "payload": json.dumps(payload)
         }
         try:
             print(f"Sending: {json.dumps(request)}")
-            response = self.send_message_to_server(json.dumps(request), server="msg")
+            response = self.send_message_to_server(request, server="msg")
             print(response)
         except Exception as e:
             print(f"Error: {str(e)}")
@@ -248,12 +337,13 @@ class KerberosClient:
 
 def main():
     """
-
+    Main function for creation of a client
     :return:
     """
     client = KerberosClient()
     client.register()
-    client.send_message_for_print("Message!")
+    client.receive_aes_key()
+    # client.send_message_for_print("Message!")
 
 
 # Todo: support for multiple clients

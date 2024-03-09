@@ -1,17 +1,16 @@
 import json
+import struct
 from datetime import datetime, timedelta
 
 import socket
-# TODO: add struct usage
 import threading
 from shared_server import *
-import base64
-from Crypto.Cipher import AES
 from uuid import uuid1
+import ast
 CLIENT_FILE = "clients.info"
-# todo use multiple message services for now leave it
 SERVERS_FILE = "servers.info"
 SERVER_IP = "127.0.0.1"
+
 
 def create_uuid():
     """creates uuid for each request, represent a client"""
@@ -38,8 +37,7 @@ class KerberosAuthServer:
     @property
     def server_ip(self):
         """
-
-        :return:
+        :return: current server ip
         """
         return self._server_ip
 
@@ -50,6 +48,12 @@ class KerberosAuthServer:
         :return: a list of clients
         """
         return self._clients
+
+    def __client_ids__(self):
+        """
+        :return: a list with all client ids
+        """
+        return [x["clientID"] for x in self.clients]
 
     @property
     def port(self):
@@ -67,7 +71,6 @@ class KerberosAuthServer:
         """
         return self._version
 
-    # TODO add support for multi servers using threads
     @property
     def servers(self):
         """
@@ -84,7 +87,6 @@ class KerberosAuthServer:
         """
         return self._message_server
 
-    # TODO add a parsing to the client names
     def get_clients_names(self):
         """
         getting a list of names from current client list
@@ -99,39 +101,53 @@ class KerberosAuthServer:
         :param client_id: client id of user initiated the request
         :return: a tuple of AES Key and ticket encrypted
         """
-        clients_ids = [x["clientID"] for x in self.clients]
-        client_index = clients_ids.index(client_id)
-        client = self.clients[client_index]
+        try:
+            clients_ids = self.__client_ids__()
+            client_index = clients_ids.index(client_id)
+            client = self.clients[client_index]
+        except Exception as e:
+            print("Client is not registered! " + str(e))
+            raise ValueError("Client Not Registered")
+
         key = client.get("passwordHash")
         bytes_key = str(key).encode()[32:]
         print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
-        aes_key = AES.new(bytes_key, AES.MODE_CBC, iv=create_iv())
-        ticket_aes_key = AES.new(base64.b64decode(self.message_server.get('key')), AES.MODE_CBC, iv=create_iv())
-        encrypted_ticket_key = encrypt_aes(ticket_aes_key, nonce, bytes_key)
+
+        session_key = create_random_byte_key(16)
+        client_key = encrypt_ng(bytes_key, session_key, nonce=nonce)
+
         creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
-        encrypted_time = encrypt_aes(ticket_aes_key, nonce, expiration_time.encode())
-        # aes_key = AES.new(get_random_bytes(32), AES.MODE_CBC, iv=get_random_bytes(16))
-        ticket_payload = self.generate_ticket(client_id, server_id, encrypted_ticket_key, creation_time, encrypted_time)
+
+        ticket_key = encrypt_ng(session_key, session_key, time=expiration_time.encode())
+
+        ticket = self.generate_ticket(client_id, server_id,  creation_time)
+        ticket["ticket_iv"] = ticket_key["iv"]
+        ticket["aes_key"] = ticket_key["encrypted_data"]
+        ticket["expiration_time"] = ticket_key["time"]
+
         return {
-            "key": aes_key,
-            "ticket": encrypt_aes(aes_key, nonce, ticket_payload.encode())
+            "encrypted_key_iv": client_key["iv"],
+            "nonce": client_key["nonce"],
+            "aes_key": client_key["encrypted_data"],
+            "ticket": ticket
         }
 
-    def generate_ticket(self, client_id, server_id, key, creation_time, expiration_time):
+    def generate_ticket(self, client_id, server_id, creation_time):
         """
         generate tgt from given key
-        :param expiration_time:
         :param creation_time:
         :param server_id: message server id
-        :param key: AES Key used for encryption
         :param client_id: client initiated request
         :return: tgt
         """
-        # ticket = f"{client_id}:{service_id}:{base64.b64encode(self.generate_salt()).decode()}"
-        ticket = f"{self.version}|{client_id}|{server_id}"
-        ticket += f"{creation_time}|{base64.b64encode(key).decode()}|{expiration_time}"
-        return ticket
+        return {
+            # TODO: change to message server version
+            "version": self.version,
+            "client_id": client_id,
+            "server_id": server_id,
+            "creation_timestamp": creation_time
+        }
 
     def register(self, request):
         """
@@ -140,13 +156,23 @@ class KerberosAuthServer:
         """
         try:
             if request["name"] in self.get_clients_names():
-                return "Error, Name already exists!"
+                password_hash = create_password_sha(request["password"])
+                client_index = self.get_clients_names().index(request["name"])
+                client = self.clients[client_index]
+                if password_hash != client["passwordHash"]:
+                    raise ValueError("Client Already Registered, password incorrect.")
+                return {
+                    "code": 1600,
+                    "version": self.version,
+                    "payloadSize": len(str(client["clientID"])),
+                    "payload": client["clientID"]
+                }
             else:
-                client_id = create_uuid()
+                client_id = str(create_uuid())[:16]
                 password_hash = create_password_sha(request["password"])
                 self.clients.append(
                     {
-                        "clientID": str(client_id),
+                        "clientID": client_id,
                         "name": request["name"],
                         "passwordHash": str(password_hash),
                         "lastSeen": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -157,38 +183,89 @@ class KerberosAuthServer:
                     "code": 1600,
                     "version": self.version,
                     "payloadSize": len(str(client_id)),
-                    "payload": str(client_id)
+                    "payload": client_id
                 }
 
         except Exception as e:
-            print(str(e))
-            return "Error! can't add user because of {}".format(str(e))
+            print("register error: \n" + str(e))
+            error_response = "Error! can't register user because of {}".format(str(e))
+            return {
+                "code": 1601,
+                "version": self.version,
+                "payloadSize": len(error_response),
+                "payload": error_response
+            }
+
+    def handle_key_request(self, request):
+        """
+        This function request a key for messaging server and generates a ticket, sending back to client
+        :param request: client request
+        :return: server response with key and ticket or Exception
+        """
+        received_payload = json.loads(request["payload"])
+        client_id = request["header"]["clientID"]
+        nonce = ast.literal_eval(received_payload["nonce"])
+        response = self.generate_session_key(client_id,
+                                             self.message_server.get("uuid"), nonce)
+        print("Created session key!")
+        print(f"generate_session_key: {response}")
+        encrypted_key = {
+            "aes_key": response.get('aes_key'),
+            "nonce": response.get('nonce'),
+            "encrypted_key_iv": response.get('encrypted_key_iv')
+        }
+        payload = {
+            "encrypted_key": encrypted_key,
+            "ticket": response.get('ticket')
+        }
+        print(f"payload: \n{payload}")
+        return {
+            "header": {
+                "code": 1603,
+                "version": self.version,
+                "payloadSize": len(payload)
+            },
+            "payload": payload
+        }
 
     def receive_client_request(self, client_socket, addr):
+        """
+        This method recieves the byte stream from socket, parses it and sends internally for handling
+        :param client_socket: socket listing to
+        :param addr: address listening to
+        :return: None
+        """
         try:
-            request = client_socket.recv(1024).decode("utf-8")
-            response = self.handle_client_request(json.loads(request))
-            client_socket.send(json.dumps(response).encode("utf-8"))
+            # receive 23 bytes of header (client id - 16, version - 1, code -2, size - 4)
+            header_data = client_socket.recv(23)
+            if len(header_data) != 23:
+                print("Header size didn't match constraints.")
+                raise ValueError
+
+            # Unpack the header fields using struct
+            client_id, version, code, payload_size = struct.unpack('<16sBH I', header_data)
+            payload_data = client_socket.recv(payload_size)
+            if len(payload_data) != payload_size:
+                print("Payload size didn't match payload, Aborting!.")
+                raise ValueError
+
+            request = {
+                "header": {
+                    "clientID": client_id.decode("utf-8"),
+                    "version": version,
+                    "code": code,
+                    "payloadSize": payload_size
+                },
+                "payload": payload_data.decode("utf-8")
+            }
+            response = self.handle_client_request(request)
+            print(f"Server will now respond with: {response}")
+            client_socket.send(json.dumps(response, default=str).encode("utf-8"))
         except Exception as e:
             print(f"Error when handling client: {e}")
         finally:
             client_socket.close()
             print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
-
-    def test_receive_client_request(self):
-        """
-        recieve request from client and parse it
-        :return: parsed dict with the request
-        """
-        # temp
-        client = name_generator()
-        print(client)
-        return client
-        # return {
-        #     "name": "alice",
-        #     "Password": "Aa132465!",
-        #     "encrypted_ticket": "encrypted_ticket_data",
-        # }
 
     def handle_client_request(self, request):
         """
@@ -196,100 +273,39 @@ class KerberosAuthServer:
         :param request: parsed dict of info
         :return: error code
         """
-        # TODO: check if payload size matches the payload size header
-        # TODO: check if version matches
         try:
+
             if not request:
                 raise NameError("request is empty!")
-            # Todo: print as json, add error handeling for json
-            print(request)
+            if "error" in request["header"]["clientID"].lower():
+                raise ValueError("Invalid ClientId")
+            if request["header"]["version"] != self.version:
+                raise ValueError("Server version don't match client version")
+            print(f"handle_client_request: \n{request}")
             code = request["header"]["code"]
+            try:
+                payload = json.loads(request["payload"])
+            except Exception as e:
+                raise ValueError("Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
             if code == 1024:
-                return self.register(request["payload"])
+                return self.register(payload)
             if code == 1027:
                 print("Client requested key")
-                client_id = request["header"]["clientID"]
-                nonce = request["payload"]["nonce"]
-                response = self.generate_session_key(client_id,
-                                                     self.message_server.get("uuid"), nonce)
-                print("Created session key!")
-                # try:
-                #     print(json.dumps(dict(response)))
-                # except ValueError as e:
-                print(response)
-                # TODO: check the encrypted key iv thing
-                encrypted_key = {
-                    "AES Key": encrypt_aes(response.get('key'), nonce, nonce),
-                    "Nonce": encrypt_aes(response.get('key'), nonce, nonce),
-                    "Encrypted Key IV": create_iv()
-                }
-                payload = {
-                    "encrypted_key": encrypted_key,
-                    "ticket": response.get('ticket')
-                }
-                # print(f"payload: \n{json.dumps(payload)}")
-                print(f"payload: \n{payload}")
-                return {
-                    "header": {
-                        "code": 1603,
-                        "version": self.version,
-                        "payloadSize": len(payload)
-                    },
-                    "payload": payload
-                }
+                return self.handle_key_request(request)
+
             return "Not supported yet!"
         except KeyError as e:
             print(f"Got Key Error on {e}")
             exit(1)
         except Exception as e:
-            print(str(e))
+            print("handle_client_request error: \n" + str(e))
             exit(1)
-
-    def register_user(self):
-        client_name_for_request = self.test_receive_client_request()
-        if client_name_for_request:
-            client_request = {
-                "header": {
-                    "code": 1024,  # register code
-                    "version": self.version
-                },
-                "payload": client_name_for_request
-            }
-            response = self.handle_client_request(client_request)
-            print(f"Server reply: {response}")
-            return response
-        return "Error"
-
-    # Todo: move to tests file
-    def test_server(self):
-        response = self.register_user()
-        while "Error" in response:
-            response = self.register_user()
-
-        print("------------------------------------------")
-        client_id = response["payload"]
-        client_request = {
-            "header": {
-                "code": 1027,  # register code
-                "version": self.version,
-                "clientID": client_id
-            },
-            "payload": {
-                "serverID": self.message_server.get("uuid"),
-                "nonce": create_nonce()
-            }
-        }
-        client_request["header"]["payloadSize"] = len(client_request["payload"])
-        print(json.dumps(client_request, indent=4, default=str))
-        response = self.handle_client_request(client_request)
-        print(f"Server reply: {response}")
 
     def start_server(self):
         """
         infinite loop of listening server
         :return:
         """
-        # client_request = self.receive_client_request()
         try:
             print(f"Server Started on port {self.port}")
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -310,15 +326,6 @@ class KerberosAuthServer:
             print(f"Error: {e}")
         finally:
             server.close()
-
-        # TODO: Use infinite loops again
-        # while True:
-        #     client_request = self.receive_client_request()
-        #     if client_request:
-        #         pass
-        # TODO add support for multi servers using threads
-        # thread = threading.Thread(target=self.handle_client_request, args=(client_request,))
-        # thread.start()
 
 
 def load_clients():
@@ -347,7 +354,7 @@ def load_clients():
                 })
             return clients
     except Exception as e:
-        print(str(e))
+        print("load_clients error: \n" + str(e))
         print("No clients found")
         return []
 
@@ -367,7 +374,7 @@ def add_client_to_file(clients):
                 clients_file.write(" PasswordHash: " + client.get("passwordHash"))
                 clients_file.write(" LastSeen: " + client.get("lastSeen") + "\n")
     except Exception as e:
-        print(str(e))
+        print("add_clients_to_file error: \n" + str(e))
         print("Couldn't add client, defaulting to previous state")
         with open(CLIENT_FILE, 'w') as clients_file:
             if backup_client is not None or backup_client != []:
