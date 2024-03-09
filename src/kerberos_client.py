@@ -1,8 +1,6 @@
-import ast
 import json
 import struct
 
-# from kerberos_auth_server import KerberosAuthServer as authserver
 from shared_server import *
 import socket
 
@@ -15,9 +13,9 @@ SERVER_ID = "hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711"
 
 def read_servers_info():
     """
-
-    :return:
-    """
+    reads from {} the servers information and stores to memory
+    :return: a dict with both auth and messaging servers ip and port
+    """.format(SERVERS_FILE)
     try:
         with open(SERVERS_FILE, 'r') as servers_file:
             servers_details = servers_file.readlines()
@@ -39,6 +37,22 @@ def read_servers_info():
         exit(1)
 
 
+def get_client_info():
+    """
+    :return: load current client from file
+    """
+    try:
+        with open(CLIENT_FILE, 'r') as client_file:
+            data = client_file.readlines()
+            return {"username": data[0].strip(), "uuid": data[1].strip()}
+    except FileNotFoundError as e:
+        print(str(e))
+        return e
+    except IndexError as e:
+        print(str(e))
+        return e
+
+
 class KerberosClient:
     """    
     This class represents a client used by the kerberos protocol.
@@ -56,10 +70,10 @@ class KerberosClient:
 
     def send_message_to_server(self, message: dict, server="auth"):
         """
-
-        :param message:
-        :param server:
-        :return:
+        This method uses the socket interface to interact with the servers, auth server and message server
+        :param message: dict representing the request to server according to the accepted format.
+        :param server: server kind -> default is auth. for message pass server="msg"
+        :return: server's response
         """
 
         if server != "auth":
@@ -68,10 +82,13 @@ class KerberosClient:
         else:
             server_ip = self._auth_server.get("ip")
             server_port = self._auth_server.get("port")
+        try:
 
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # TODO: better error handeling. If socket can't be open say it
-        client.connect((server_ip, server_port))
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.connect((server_ip, server_port))
+        except socket.error as e:
+            print("Socket error -> " + str(e))
+            exit(1)
         try:
             header_data = struct.pack('<16sBH I',  str.encode(message["header"]["clientID"]), message["header"]["version"], message["header"]["code"], message["header"]["payloadSize"])
 
@@ -91,16 +108,14 @@ class KerberosClient:
     @property
     def client_id(self):
         """
-
-        :return:
+        :return: client id in system
         """
         return self._client_id
 
     def __client_id__(self, uuid):
         """
-
-        :param uuid:
-        :return:
+        :param uuid: server's response new uuid
+        :return: saves uuid to system
         """
         self._client_id = uuid
 
@@ -138,28 +153,11 @@ class KerberosClient:
 
     def create_sha256(self, password):
         """
-
-        :param password:
-        :return:
+        :param password: client password
+        :return: saves sha of password
         """
 
         self._sha256 = str(create_password_sha(password)).encode()[32:]
-
-    def get_client_info(self):
-        """
-
-        :return:
-        """
-        try:
-            with open(CLIENT_FILE, 'r') as client_file:
-                data = client_file.readlines()
-                return {"username": data[0].strip(), "uuid": data[1].strip()}
-        except FileNotFoundError as e:
-            print(str(e))
-            return e
-        except IndexError as e:
-            print(str(e))
-            return e
 
     def register(self):
         """
@@ -167,7 +165,7 @@ class KerberosClient:
         :param username: string representing a username.
         """
         try:
-            client_info = self.get_client_info()
+            client_info = get_client_info()
             if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
                 raise client_info  # Raises the caught exception to handle it in the except block
             username = client_info["username"]
@@ -189,11 +187,11 @@ class KerberosClient:
 
     def validate_existing_user(self, client_id: str, username: str, password: str):
         """
-
-        :param client_id:
-        :param username:
-        :param password:
-        :return:
+        Validates if existing user is legit by comparing password sha using auth server
+        :param client_id: stored client id
+        :param username: stored username
+        :param password: new input password
+        :return: saves new sha or execption
         """
         payload = {
             "name": username,
@@ -218,7 +216,6 @@ class KerberosClient:
             print("Not valid server response")
         except ValueError as e:
             print("Caught Value Error when validating password: " + str(e))
-            # TODO: Unexpected registration error! 'header'
         except Exception as e:
             print(f"Unexpected registration error! " + str(e))
 
@@ -267,8 +264,6 @@ class KerberosClient:
         decrypts the key and saves it along with the ticket for future use.
         """
         try:
-            client_info = self.get_client_info()
-            uuid = client_info["uuid"]
             # nonce = create_nonce()
             nonce = str(create_nonce())
             payload = {
@@ -277,7 +272,7 @@ class KerberosClient:
             }
             request = {
                 "header": {
-                    "clientID": uuid,
+                    "clientID": self.client_id,
                     "version": self.version,
                     "code": 1027,
                 },
@@ -291,9 +286,8 @@ class KerberosClient:
             try:
                 decrypted_key = decrypt_ng(self.sha256, encrypted_key["aes_key"], encrypted_key["encrypted_key_iv"])
                 if isinstance(decrypted_key, Exception):  # Checks if an error occurred while getting client info
-                    raise client_info
+                    raise decrypted_key
                 self._aes_key = decrypted_key
-                # self._ticket = ast.literal_eval(ticket)
                 self._ticket = ticket
             except ValueError as e:
                 print("Value Error: " + str(e))
@@ -302,7 +296,6 @@ class KerberosClient:
             print("Response from server is not valid \n" + ERROR_MESSAGE)
         except Exception as e:
             print("Caught Error: " + str(e))
-
 
     def send_aes_key(self, aes_key):
         """
@@ -317,7 +310,6 @@ class KerberosClient:
         :param message: a message to encrypt.
         """
         nonce = create_nonce()
-        # encrypted_message = encrypt_aes(self.aes_key, nonce, message)
         encrypted_message = message.strip()
         payload = {
             "messageSize": len(encrypted_message),
@@ -345,7 +337,7 @@ class KerberosClient:
 
 def main():
     """
-
+    Main function for creation of a client
     :return:
     """
     client = KerberosClient()

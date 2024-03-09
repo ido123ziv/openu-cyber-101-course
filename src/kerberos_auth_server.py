@@ -5,8 +5,6 @@ from datetime import datetime, timedelta
 import socket
 import threading
 from shared_server import *
-from base64 import b64encode, b64decode
-from Crypto.Cipher import AES
 from uuid import uuid1
 import ast
 CLIENT_FILE = "clients.info"
@@ -39,8 +37,7 @@ class KerberosAuthServer:
     @property
     def server_ip(self):
         """
-
-        :return:
+        :return: current server ip
         """
         return self._server_ip
 
@@ -54,7 +51,6 @@ class KerberosAuthServer:
 
     def __client_ids__(self):
         """
-
         :return: a list with all client ids
         """
         return [x["clientID"] for x in self.clients]
@@ -75,7 +71,6 @@ class KerberosAuthServer:
         """
         return self._version
 
-    # TODO add support for multi servers using threads
     @property
     def servers(self):
         """
@@ -101,7 +96,6 @@ class KerberosAuthServer:
         return [x["name"] for x in self.clients]
 
     def generate_session_key(self, client_id, server_id, nonce):
-        # TODO: error (can only concatenate str (not "bytes") to str)
         """
         :param nonce: random value created by the client
         :param server_id: messaging server id
@@ -156,7 +150,6 @@ class KerberosAuthServer:
             "creation_timestamp": creation_time
         }
 
-    # TODO: add to register flow to check sha for registered users.
     def register(self, request):
         """
         These methods handle the registration of a client to the server
@@ -205,10 +198,14 @@ class KerberosAuthServer:
             }
 
     def handle_key_request(self, request):
-        recived_payload = json.loads(request["payload"])
+        """
+        This function request a key for messaging server and generates a ticket, sending back to client
+        :param request: client request
+        :return: server response with key and ticket or Exception
+        """
+        received_payload = json.loads(request["payload"])
         client_id = request["header"]["clientID"]
-        nonce = ast.literal_eval(recived_payload["nonce"])
-        print("lala")
+        nonce = ast.literal_eval(received_payload["nonce"])
         response = self.generate_session_key(client_id,
                                              self.message_server.get("uuid"), nonce)
         print("Created session key!")
@@ -234,6 +231,12 @@ class KerberosAuthServer:
         }
 
     def receive_client_request(self, client_socket, addr):
+        """
+        This method recieves the byte stream from socket, parses it and sends internally for handling
+        :param client_socket: socket listing to
+        :param addr: address listening to
+        :return: None
+        """
         try:
             # receive 23 bytes of header (client id - 16, version - 1, code -2, size - 4)
             header_data = client_socket.recv(23)
@@ -305,7 +308,6 @@ class KerberosAuthServer:
         infinite loop of listening server
         :return:
         """
-        # client_request = self.receive_client_request()
         try:
             print(f"Server Started on port {self.port}")
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -326,10 +328,6 @@ class KerberosAuthServer:
             print(f"Error: {e}")
         finally:
             server.close()
-
-        # TODO add support for multi servers using threads
-        # thread = threading.Thread(target=self.handle_client_request, args=(client_request,))
-        # thread.start()
 
 
 def load_clients():
