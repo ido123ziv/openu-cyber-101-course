@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import struct
 
@@ -297,12 +298,31 @@ class KerberosClient:
         except Exception as e:
             print("Caught Error: " + str(e))
 
-    def send_aes_key(self, aes_key):
+    def send_aes_key(self, server=SERVER_ID):
         """
         sends an authenticator and a ticket to the message server.
-        :param aes_key: AES Symmetric Key.
+        :param server: messaging server id
         """
-        pass
+        try:
+            authenticator = self.create_authenticator(server, self.client_id)
+            ticket = self.ticket
+            payload = {
+                "authenticator": authenticator,
+                "ticket": ticket
+            }
+            request = {
+                "header": {
+                    "clientID": self.client_id,
+                    "version": self.version,
+                    "code": 1028,
+                    "payloadSize": len(json.dumps(payload))
+                },
+                "payload": json.dumps(payload)
+            }
+            self.send_message_to_server(request, server="msg")
+        except Exception as e:
+            print("send_aes_key: {}".format(str(e)))
+            
 
     def send_message_for_print(self, message: str):
         """
@@ -334,6 +354,35 @@ class KerberosClient:
             print(f"Error: {str(e)}")
             print(ERROR_MESSAGE)
 
+    def create_authenticator(self, server_id, client_id):
+
+        """
+        creates an authenticator using an AES key.
+        :param client_id: client unique id.
+        :param server_id: server unique id.
+        :return: the authenticator that was created.
+        """
+        nonce = create_nonce()
+        creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        unencrypted_data = {
+            "version": str(self.version).encode(),
+            "client_id": client_id.encode(),
+            "server_id": server_id.encode(),
+            "timestamp": creation_time.encode(),
+            "nonce": nonce
+        }
+        encrypted_data = encrypt_ng(self._aes_key, unencrypted_data)
+
+        return {
+            "authenticatorIV": encrypted_data["iv"],
+            "version": encrypted_data["version"],
+            "clientID": encrypted_data["client_id"],
+            "serverID": encrypted_data["server_id"],
+            "creationTime": encrypted_data["timestamp"]
+        }
+
+
+
 
 def main():
     """
@@ -343,6 +392,7 @@ def main():
     client = KerberosClient()
     client.register()
     client.receive_aes_key()
+    client.send_aes_key()
     # client.send_message_for_print("Message!")
 
 

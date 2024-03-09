@@ -3,7 +3,7 @@ import struct
 import threading
 from shared_server import *
 import socket
-
+from base64 import b64decode
 SERVER_FILE = "msg.info"
 
 
@@ -65,7 +65,7 @@ class KerberosMessageServer:
             self._name = server["name"]
             self._uuid = server["uuid"]
             self._version = get_version()
-            self._key = base64.b64decode(server["key"])
+            self._key = server["key"]
             self._lock = threading.Lock()
             self._clients = {}
         except Exception as e:
@@ -128,13 +128,11 @@ class KerberosMessageServer:
         """
         try:
             ticket = request.get("ticket")
-            authenticator = request("authenticator")
-            aes_key = ticket.decode().split('|')[-2:-1]
-            auth_data = decrypt_aes(authenticator, self.key)
-            self._clients.add({
-                "client_id": auth_data['clientID'],
-                "key": aes_key,
-                "auth_iv": auth_data["authenticatorIV"]
+            authenticator = request.get("authenticator")
+            aes_key = decrypt_ng(self.key, ticket["aes_key"], ticket["ticket_iv"])
+            client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
+            self._clients[client_id] = ({
+                "key": aes_key
             })
             return dict(Code=1604)
         except Exception as e:
@@ -235,9 +233,13 @@ class KerberosMessageServer:
             if not request:
                 raise NameError("request is empty!")
             print(f"Got Request: {request}")
+            try:
+                payload = json.loads(request["payload"])
+            except Exception as e:
+                raise ValueError("Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
             code = request["header"]["code"]
             if code == 1028:
-                return self.get_and_decrypt_key(request["payload"])
+                return self.get_and_decrypt_key(payload)
             elif code == 1029:
                 try:
                     payload = json.loads(request["payload"])
@@ -246,6 +248,8 @@ class KerberosMessageServer:
                     raise ValueError("Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
             else:
                 raise ValueError("Not Valid request code")
+        except KeyError as e:
+            print("Invalid request. \nRequest: {}\nError: {}".format(request, str(e)))
         except Exception as e:
             print("handle_client_request error: " + str(e))
             return {"code": default_error()}
@@ -276,12 +280,6 @@ class KerberosMessageServer:
             print(f"Error: {e}")
         finally:
             server.close()
-        pass
-        # while True:
-        #     client_request = self.receive_client_request()
-        #     if client_request:
-        #         thread = threading.Thread(target=self.handle_client_request, args=(client_request,))
-        #         thread.start()
 
 
 def main():
@@ -300,5 +298,4 @@ def main():
 
 
 if __name__ == "__main__":
-    print("Hello World")
     main()
