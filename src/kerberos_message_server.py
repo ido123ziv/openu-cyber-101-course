@@ -65,7 +65,7 @@ class KerberosMessageServer:
             self._name = server["name"]
             self._uuid = server["uuid"]
             self._version = get_version()
-            self._key = base64.b64decode(server["key"])
+            self._key = base64.b64decode(server["key"]) # a symmetric key between message server and auth server
             self._lock = threading.Lock()
             self._clients = {}
         except Exception as e:
@@ -127,18 +127,17 @@ class KerberosMessageServer:
         :return: response code whether succeeded or not
         """
         try:
-            ticket = request.get("ticket")
-            authenticator = request("authenticator")
-            aes_key = ticket.decode().split('|')[-2:-1]
-            auth_data = decrypt_aes(authenticator, self.key)
+            authenticator = request["payload"]["authenticator"]
+            ticket = request["payload"]["ticket"]
+            aes_key = ticket.decode().split('|')[-2:-1] # the symetric key between message server and client
             self._clients.add({
-                "client_id": auth_data['clientID'],
+                "client_id": decrypt_aes(authenticator["clientID"], aes_key),
                 "key": aes_key,
-                "auth_iv": auth_data["authenticatorIV"]
+                "auth_iv": authenticator["authenticatorIV"]
             })
             return dict(Code=1604)
         except Exception as e:
-            print("get_and_decrypt_key error: " + str(e))
+            print(str(e))
             return default_error()
 
     def find_client_by_iv(self, message_iv):
@@ -295,7 +294,7 @@ def main():
     print(f"Port: {server.port}")
     print(f"Version: {server.version}")
     print(f"my uuid is {server.uuid}")
-    print(f"my key is {server.key}")
+    print(f"a shared key between me and the auth server is {server.key}")
     server.start_server()
 
 
