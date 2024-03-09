@@ -87,7 +87,6 @@ class KerberosAuthServer:
         """
         return self._message_server
 
-    # TODO add a parsing to the client names
     def get_clients_names(self):
         """
         getting a list of names from current client list
@@ -209,7 +208,6 @@ class KerberosAuthServer:
         response = self.generate_session_key(client_id,
                                              self.message_server.get("uuid"), nonce)
         print("Created session key!")
-        # TODO: why ticket is 322 bytes and not 99?
         print(f"generate_session_key: {response}")
         encrypted_key = {
             "aes_key": response.get('aes_key'),
