@@ -131,7 +131,11 @@ class KerberosMessageServer:
             ticket = request.get("ticket")
             authenticator = request.get("authenticator")
             aes_key = decrypt_ng(self.key, ticket["aes_key"], ticket["ticket_iv"])
-            client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
+            client_id = ticket.get("client_id")
+            recieved_client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
+
+            print(f"ticket client id: {client_id}\nauthenticator client id: {recieved_client_id}")
+
             self._clients[client_id] = {
                 "key": aes_key
             }
@@ -156,7 +160,7 @@ class KerberosMessageServer:
                 raise ValueError("Unregistered User")
             client_key = self._clients[client_id]["key"]
 
-            decrypted_message = decrypt_ng(client_key, message, request["messageIV"])
+            decrypted_message = decrypt_ng(client_key, message, request["messageIV"]).decode("utf-8")
             print("decrypted message: " + decrypted_message)
             return dict(Code=1605)
         except Exception as e:
