@@ -1,8 +1,8 @@
 import json
 import struct
-# import sys
+import sys
 from datetime import datetime, timedelta
-# import logging
+import logging
 
 import socket
 import threading
@@ -108,7 +108,7 @@ class KerberosAuthServer:
             client_index = clients_ids.index(client_id)
             client = self.clients[client_index]
         except Exception as e:
-            print("Client is not registered! " + str(e))
+            logging.error("Client is not registered! " + str(e))
             raise ValueError("Client Not Registered")
 
         key = client.get("passwordHash")
@@ -188,7 +188,7 @@ class KerberosAuthServer:
                 }
 
         except Exception as e:
-            print("register error: \n" + str(e))
+            logging.error("register error: \n" + str(e))
             error_response = "Error! can't register user because of {}".format(str(e))
             return {
                 "code": 1601,
@@ -208,8 +208,8 @@ class KerberosAuthServer:
         nonce = ast.literal_eval(received_payload["nonce"])
         response = self.generate_session_key(client_id,
                                              self.message_server.get("uuid"), nonce)
-        # print("Created session key!")
-        # print(f"generate_session_key: {response}")
+        logging.info("Created session key!")
+        logging.debug(f"generate_session_key: {response}")
         encrypted_key = {
             "aes_key": response.get('aes_key'),
             "nonce": response.get('nonce'),
@@ -219,7 +219,7 @@ class KerberosAuthServer:
             "encrypted_key": encrypted_key,
             "ticket": response.get('ticket')
         }
-        # print(f"payload: \n{payload}")
+        logging.debug(f"payload: \n{payload}")
         return {
             "header": {
                 "code": 1603,
@@ -240,14 +240,14 @@ class KerberosAuthServer:
             # receive 23 bytes of header (client id - 16, version - 1, code -2, size - 4)
             header_data = client_socket.recv(23)
             if len(header_data) != 23:
-                print("Header size didn't match constraints.")
+                logging.error("Header size didn't match constraints.")
                 raise ValueError
 
             # Unpack the header fields using struct
             client_id, version, code, payload_size = struct.unpack('<16sBH I', header_data)
             payload_data = client_socket.recv(payload_size)
             if len(payload_data) != payload_size:
-                print("Payload size didn't match payload, Aborting!.")
+                logging.exception("Payload size didn't match payload, Aborting!.")
                 raise ValueError
 
             request = {
@@ -260,13 +260,13 @@ class KerberosAuthServer:
                 "payload": payload_data.decode("utf-8")
             }
             response = self.handle_client_request(request)
-            # print(f"Server will now respond with: {response}")
+            logging.debug(f"Server will now respond with: {response}")
             client_socket.send(json.dumps(response, default=str).encode("utf-8"))
         except Exception as e:
-            print(f"Error when handling client: {e}")
+            logging.error(f"Error when handling client: {e}")
         finally:
             client_socket.close()
-            # print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+            logging.debug(f"Connection to client ({addr[0]}:{addr[1]}) closed")
 
     def handle_client_request(self, request):
         """
@@ -282,7 +282,7 @@ class KerberosAuthServer:
                 raise ValueError("Invalid ClientId")
             if request["header"]["version"] != self.version:
                 raise ValueError("Server version don't match client version")
-            # print(f"handle_client_request: \n{request}")
+            logging.debug(f"handle_client_request: \n{request}")
             code = request["header"]["code"]
             try:
                 payload = json.loads(request["payload"])
@@ -291,15 +291,15 @@ class KerberosAuthServer:
             if code == 1024:
                 return self.register(payload)
             if code == 1027:
-                print("Client requested key")
+                logging.debug("Client requested key")
                 return self.handle_key_request(request)
 
             return "Not supported yet!"
         except KeyError as e:
-            print(f"Got Key Error on {e}")
+            logging.error(f"Got Key Error on {e}")
             exit(1)
         except Exception as e:
-            print("handle_client_request error: \n" + str(e))
+            logging.exception("handle_client_request error: \n" + str(e))
             exit(1)
 
     def start_server(self):
@@ -308,23 +308,23 @@ class KerberosAuthServer:
         :return:
         """
         try:
-            print(f"Server Started on port {self.port}")
+            logging.info(f"Server Started on port {self.port}")
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # bind the socket to the host and port
             server.bind((self.server_ip, self.port))
             # listen for incoming connections
             server.listen()
-            print(f"Listening on {self.server_ip}:{self.port}")
+            logging.info(f"Listening on {self.server_ip}:{self.port}")
 
             while True:
                 # accept a client connection
                 client_socket, addr = server.accept()
-                print(f"Accepted connection from {addr[0]}:{addr[1]}")
+                logging.info(f"Accepted connection from {addr[0]}:{addr[1]}")
                 # start a new thread to handle the client
                 thread = threading.Thread(target=self.receive_client_request, args=(client_socket, addr,))
                 thread.start()
         except Exception as e:
-            print(f"Error: {e}")
+            logging.error(f"Error: {e}")
         finally:
             server.close()
 
@@ -355,8 +355,8 @@ def load_clients():
                 })
             return clients
     except Exception as e:
-        print("load_clients error: \n" + str(e))
-        print("No clients found")
+        logging.exception("load_clients error: \n" + str(e))
+        logging.error("No clients found")
         return []
 
 
@@ -375,8 +375,8 @@ def add_client_to_file(clients):
                 clients_file.write(" PasswordHash: " + client.get("passwordHash"))
                 clients_file.write(" LastSeen: " + client.get("lastSeen") + "\n")
     except Exception as e:
-        print("add_clients_to_file error: \n" + str(e))
-        print("Couldn't add client, defaulting to previous state")
+        logging.error("add_clients_to_file error: \n" + str(e))
+        logging.exception("Couldn't add client, defaulting to previous state")
         with open(CLIENT_FILE, 'w') as clients_file:
             if backup_client is not None or backup_client != []:
                 clients_file.writelines(backup_client)
@@ -386,20 +386,20 @@ def main():
     """
     main function
     """
-    # logging.basicConfig(stream=sys.stdout, level=get_log_level())
-    server = KerberosAuthServer()
-    print("Kerberos Server")
-    # logging.log("I'm a Kerberos Server!")
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s | %(levelname)8s | %(message)s')
 
-    # logging.debug(f"my clients are: {server.clients}")
-    # logging.debug(f"using port: {server.port}")
-    # logging.debug(f"my version is {server.version}")
-    # logging.debug(f"message_sever in use: {server.message_server}")
-    # logging.debug(f"my messaging servers {server.servers}")
+    server = KerberosAuthServer()
+    # print("Kerberos Server")
+    logging.info("I'm a Kerberos Server!")
+
+    logging.debug(f"my clients are: {server.clients}")
+    logging.debug(f"using port: {server.port}")
+    logging.debug(f"my version is {server.version}")
+    logging.debug(f"message_sever in use: {server.message_server}")
+    logging.debug(f"my messaging servers {server.servers}")
     server.start_server()
 
 
 if __name__ == "__main__":
-    # print("Hello World")
     main()
 

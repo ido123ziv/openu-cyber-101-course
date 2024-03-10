@@ -1,8 +1,8 @@
 import json
 import string
 import random
-# import logging
-# import os
+import logging
+import os
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Cipher import AES
@@ -10,10 +10,10 @@ from Crypto.Random import get_random_bytes
 from base64 import b64encode, b64decode
 
 
-# def get_log_level():
-#     if os.environ.get("LOG_LEVEL") is not None and "debug" in os.environ.get("LOG_LEVEL"):
-#         return logging.DEBUG
-#     return logging.INFO
+def get_log_level():
+    if os.environ.get("LOG_LEVEL") is not None and "debug" in os.environ.get("LOG_LEVEL"):
+        return logging.DEBUG
+    return logging.INFO
 
 
 PORT_FILE = "port.info"
@@ -166,3 +166,24 @@ def name_generator():
     password = name[0].upper() + name[0].lower() + "123456!"
     return {"name": name, "password": password}
 
+
+class CustomFormatter(logging.Formatter):
+    grey = "\\x1b[38;21m"
+    yellow = "\\x1b[33;21m"
+    red = "\\x1b[31;21m"
+    bold_red = "\\x1b[31;1m"
+    reset = "\\x1b[0m"
+    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: grey + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
