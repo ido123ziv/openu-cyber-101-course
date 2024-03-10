@@ -1,6 +1,8 @@
+import sys
 from datetime import datetime
 import json
 import struct
+# import logging
 
 from shared_server import *
 import socket
@@ -96,15 +98,19 @@ class KerberosClient:
             client.send(header_data + message["payload"].encode("utf-8"))
             response = client.recv(1024)
             response = response.decode("utf-8")
-            print(f"Received: {response}")
+            # print(f"Received: {response}")
+            if not response or response is None:
+                raise ValueError("Server response is empty")
             return response
         except KeyError as e:
             print(f"Wrong input of key - {e}")
+            return {}
         except Exception as e:
             print(f"Error: {e}")
+            return e
         finally:
             client.close()
-            print("Connection to server closed")
+            # print("Connection to server closed")
 
     @property
     def client_id(self):
@@ -163,8 +169,8 @@ class KerberosClient:
     def register(self):
         """
         sends a register request to the auth server.
-        :param username: string representing a username.
         """
+        print("Register")
         try:
             client_info = get_client_info()
             if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
@@ -173,6 +179,7 @@ class KerberosClient:
             uuid = client_info["uuid"]
             self.__client_id__(uuid)
             if self.sha256 is None:
+                print(f"Welcome back user: {username}, uuid: {uuid}")
                 password = input("Please retype your password: ")
                 self.validate_existing_user(uuid, username, password)
         except (FileNotFoundError, IndexError) as e:
@@ -194,6 +201,8 @@ class KerberosClient:
         :param password: new input password
         :return: saves new sha or execption
         """
+        print("existing user registering")
+
         payload = {
             "name": username,
             "password": password
@@ -209,6 +218,8 @@ class KerberosClient:
         }
         try:
             response = self.send_message_to_server(request)
+            if isinstance(response, Exception):
+                raise response
             response_data = json.loads(response)
             if "error" in response_data["payload"].lower() or response_data["code"] == 1601:
                 raise ValueError("Server error: " + response_data["payload"])
@@ -227,6 +238,7 @@ class KerberosClient:
         :param password:
         :return:
         """
+        print("new user registration")
         payload = {
             "name": username,
             "password": password
@@ -242,6 +254,8 @@ class KerberosClient:
         }
         try:
             response = self.send_message_to_server(request)
+            if isinstance(response, Exception):
+                raise response
             response_data = json.loads(response)
             if "error" in response_data["payload"].lower():
                 raise ValueError("Server error: " + response_data["payload"])
@@ -264,6 +278,7 @@ class KerberosClient:
         receives an aes key and a ticket to a message server.
         decrypts the key and saves it along with the ticket for future use.
         """
+        # print("Requesting AES KEY from Auth Server")
         try:
             # nonce = create_nonce()
             nonce = str(create_nonce())
@@ -303,6 +318,7 @@ class KerberosClient:
         sends an authenticator and a ticket to the message server.
         :param server: messaging server id
         """
+        # print(f"Sending AES KEY to: {server}")
         try:
             authenticator = self.create_authenticator(server, self.client_id)
             ticket = self.ticket
@@ -344,9 +360,9 @@ class KerberosClient:
             "payload": json.dumps(payload)
         }
         try:
-            print(f"Sending: {json.dumps(request)}")
+            # print(f"Sending: {json.dumps(request)}")
             response = self.send_message_to_server(request, server="msg")
-            print(response)
+            # print(response)
         except Exception as e:
             print(f"Error: {str(e)}")
             print(ERROR_MESSAGE)
@@ -384,7 +400,9 @@ def main():
     Main function for creation of a client
     :return:
     """
+    # logging.basicConfig(stream=sys.stdout, level=get_log_level())
     client = KerberosClient()
+
     client.register()
     client.receive_aes_key()
     client.send_aes_key()
@@ -399,5 +417,6 @@ def main():
 
 # Todo: support for multiple clients
 if __name__ == "__main__":
-    print("Hello World")
+    # print("Hello World")
     main()
+
