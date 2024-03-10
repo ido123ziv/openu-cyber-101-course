@@ -94,7 +94,7 @@ class KerberosClient:
 
     def register(self):
         """
-        sends a register request to the auth server.
+        sends a client register request to the auth server.
         when the client's info ('me.info') doesn't exist, fetch it as input.
         """
         try:
@@ -136,6 +136,52 @@ class KerberosClient:
         except Exception as e:
             print(e)
             print("Unsuccessful registration.")
+            exit(1)
+
+
+    def register_server(self):
+        """
+        sends a message server register request to the auth server.
+        """
+        try:
+            client_info = self.get_client_info()
+            username = client_info["username"]
+            uuid = client_info["uuid"]
+            request = {
+                "header":{
+                    "clientID": uuid, 
+                    "version": self.version,
+                    "code": 1025,
+                    "payloadSize": len(username) + len(self.aes_key)
+                },
+                "payload":{
+                    "name": username,
+                    "aes_key": self.aes_key
+                }
+            }
+            # TODO: handle the response
+            response = authserver.register_server(request)
+        except Exception as e:
+            print(e)
+            print("Unsuccessful server registration.")
+            exit(1)
+
+
+    def message_servers_list_request(self):
+        """
+        """
+        try:
+            client_info = self.get_client_info()
+            request = {
+                "clientID": client_info["uuid"], 
+                "version": self.version,
+                "code": 1026,
+                "payloadSize": 0
+            }
+            # TODO: handle the response
+            response = authserver.get_message_servers_list(request)
+        except Exception as e:
+            print(e)
             exit(1)
 
 
