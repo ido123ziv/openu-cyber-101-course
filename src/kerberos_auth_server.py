@@ -94,9 +94,11 @@ class KerberosAuthServer:
         """
         return [x["name"] for x in self.clients]
 
-    def generate_session_key(self, request: dict):
+    def generate_session_key(self, client_id, server_id, nonce):
         """
-        :param request: client's request as a dict
+        :param nonce:
+        :param server_id:
+        :param client_id:
         :return: a tuple of AES Key and ticket encrypted
         """
         try:
