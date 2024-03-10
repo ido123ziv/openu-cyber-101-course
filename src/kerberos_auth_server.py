@@ -1,6 +1,8 @@
 import json
 import struct
+# import sys
 from datetime import datetime, timedelta
+# import logging
 
 import socket
 import threading
@@ -111,7 +113,7 @@ class KerberosAuthServer:
 
         key = client.get("passwordHash")
         bytes_key = str(key).encode()[32:]
-        print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
+        # print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
 
         session_key = create_random_byte_key(16)
         client_key = encrypt_ng(bytes_key, {"encrypted_data": session_key, "nonce": nonce})
@@ -206,8 +208,8 @@ class KerberosAuthServer:
         nonce = ast.literal_eval(received_payload["nonce"])
         response = self.generate_session_key(client_id,
                                              self.message_server.get("uuid"), nonce)
-        print("Created session key!")
-        print(f"generate_session_key: {response}")
+        # print("Created session key!")
+        # print(f"generate_session_key: {response}")
         encrypted_key = {
             "aes_key": response.get('aes_key'),
             "nonce": response.get('nonce'),
@@ -217,7 +219,7 @@ class KerberosAuthServer:
             "encrypted_key": encrypted_key,
             "ticket": response.get('ticket')
         }
-        print(f"payload: \n{payload}")
+        # print(f"payload: \n{payload}")
         return {
             "header": {
                 "code": 1603,
@@ -258,13 +260,13 @@ class KerberosAuthServer:
                 "payload": payload_data.decode("utf-8")
             }
             response = self.handle_client_request(request)
-            print(f"Server will now respond with: {response}")
+            # print(f"Server will now respond with: {response}")
             client_socket.send(json.dumps(response, default=str).encode("utf-8"))
         except Exception as e:
             print(f"Error when handling client: {e}")
         finally:
             client_socket.close()
-            print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+            # print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
 
     def handle_client_request(self, request):
         """
@@ -280,7 +282,7 @@ class KerberosAuthServer:
                 raise ValueError("Invalid ClientId")
             if request["header"]["version"] != self.version:
                 raise ValueError("Server version don't match client version")
-            print(f"handle_client_request: \n{request}")
+            # print(f"handle_client_request: \n{request}")
             code = request["header"]["code"]
             try:
                 payload = json.loads(request["payload"])
@@ -384,16 +386,20 @@ def main():
     """
     main function
     """
+    # logging.basicConfig(stream=sys.stdout, level=get_log_level())
     server = KerberosAuthServer()
-    print(f"I'm a Kerberos Server!")
-    print(f"my clients are: {server.clients}")
-    print(f"using port: {server.port}")
-    print(f"my version is {server.version}")
-    print(f"message_sever in use: {server.message_server}")
-    print(f"my messaging servers {server.servers}")
+    print("Kerberos Server")
+    # logging.log("I'm a Kerberos Server!")
+
+    # logging.debug(f"my clients are: {server.clients}")
+    # logging.debug(f"using port: {server.port}")
+    # logging.debug(f"my version is {server.version}")
+    # logging.debug(f"message_sever in use: {server.message_server}")
+    # logging.debug(f"my messaging servers {server.servers}")
     server.start_server()
 
 
 if __name__ == "__main__":
-    print("Hello World")
+    # print("Hello World")
     main()
+

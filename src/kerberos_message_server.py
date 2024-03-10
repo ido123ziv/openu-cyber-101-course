@@ -1,8 +1,11 @@
 import json
 import struct
+# import sys
 import threading
 from shared_server import *
 import socket
+# import logging
+
 from base64 import b64decode
 
 SERVER_FILE = "msg.info"
@@ -135,7 +138,7 @@ class KerberosMessageServer:
             # TODO compare client id if ticket to authenticator
             recieved_client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
 
-            print(f"ticket client id: {client_id}\nauthenticator client id: {recieved_client_id}")
+            # print(f"ticket client id: {client_id}\nauthenticator client id: {recieved_client_id}")
 
             self._clients[client_id] = {
                 "key": aes_key
@@ -197,7 +200,7 @@ class KerberosMessageServer:
             print(f"Error when handling client: {e}")
         finally:
             client_socket.close()
-            print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+            # print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
 
     def handle_client_request(self, request):
         """
@@ -208,7 +211,7 @@ class KerberosMessageServer:
         try:
             if not request:
                 raise NameError("request is empty!")
-            print(f"Got Request: {request}")
+            # print(f"Got Request: {request}")
             try:
                 payload = json.loads(request["payload"])
             except Exception as e:
@@ -265,12 +268,14 @@ def main():
     :return:
     """
     server = KerberosMessageServer()
+    # logging.basicConfig(stream=sys.stdout, level=get_log_level())
     print("I'm a messages server!")
-    print(f"My name is {server.name}")
-    print(f"Port: {server.port}")
-    print(f"Version: {server.version}")
-    print(f"my uuid is {server.uuid}")
-    print(f"my key is {server.key}")
+    # print(f"My name is {server.name}")
+    # print(f"Port: {server.port}")
+    # print(f"Version: {server.version}")
+    # print(f"my uuid is {server.uuid}")
+    # print(f"my key is {server.key}")
+
     server.start_server()
 
 

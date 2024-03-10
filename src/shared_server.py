@@ -1,12 +1,20 @@
 import json
 import string
 import random
-
+# import logging
+# import os
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from base64 import b64encode, b64decode
+
+
+# def get_log_level():
+#     if os.environ.get("LOG_LEVEL") is not None and "debug" in os.environ.get("LOG_LEVEL"):
+#         return logging.DEBUG
+#     return logging.INFO
+
 
 PORT_FILE = "port.info"
 MESSAGE_SERVER_FILE = "msg.info"
@@ -101,7 +109,7 @@ def encrypt_ng(key, data):
         ct_bytes = cipher.encrypt(pad(value, AES.block_size))
         ct = b64encode(ct_bytes).decode('utf-8')
         encrypted_struct[key] = ct
-    print(json.dumps(encrypted_struct))
+    # print(json.dumps(encrypted_struct))
     return encrypted_struct
 
 
@@ -118,7 +126,7 @@ def decrypt_ng(key, data, iv):
         parse_data = b64decode(data)
         cipher = AES.new(key, AES.MODE_CBC, parse_iv)
         pt = unpad(cipher.decrypt(parse_data), AES.block_size)
-        print("The message was: ", pt)
+        # print("The message was: ", pt)
         return pt
     except (ValueError, KeyError) as e:
         print("Got Error, Incorrect decryption")
@@ -157,3 +165,4 @@ def name_generator():
     name = ''.join(random.choices(string.ascii_lowercase, k=random.randint(3, 5)))
     password = name[0].upper() + name[0].lower() + "123456!"
     return {"name": name, "password": password}
+
