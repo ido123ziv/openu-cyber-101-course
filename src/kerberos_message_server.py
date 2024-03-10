@@ -132,6 +132,7 @@ class KerberosMessageServer:
             authenticator = request.get("authenticator")
             aes_key = decrypt_ng(self.key, ticket["aes_key"], ticket["ticket_iv"])
             client_id = ticket.get("client_id")
+            # TODO compare client id if ticket to authenticator
             recieved_client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
 
             print(f"ticket client id: {client_id}\nauthenticator client id: {recieved_client_id}")

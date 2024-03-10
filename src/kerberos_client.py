@@ -401,6 +401,3 @@ def main():
 if __name__ == "__main__":
     print("Hello World")
     main()
-"""
-b'\xb4I\xc9\x80\xbe\x1a\x9d1Ns\xa5J\x99|\xc6U'
-"""
