@@ -275,6 +275,7 @@ def main():
     # print(f"Version: {server.version}")
     # print(f"my uuid is {server.uuid}")
     # print(f"my key is {server.key}")
+
     server.start_server()
 
 

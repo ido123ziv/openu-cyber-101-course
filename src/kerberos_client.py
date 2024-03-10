@@ -4,6 +4,7 @@ import json
 import struct
 # import logging
 
+
 from shared_server import *
 import socket
 
@@ -125,6 +126,7 @@ class KerberosClient:
         :return: saves uuid to system
         """
         self._client_id = uuid
+
 
     @property
     def version(self):
@@ -363,6 +365,7 @@ class KerberosClient:
             # print(f"Sending: {json.dumps(request)}")
             response = self.send_message_to_server(request, server="msg")
             # print(response)
+
         except Exception as e:
             print(f"Error: {str(e)}")
             print(ERROR_MESSAGE)
@@ -402,7 +405,6 @@ def main():
     """
     # logging.basicConfig(stream=sys.stdout, level=get_log_level())
     client = KerberosClient()
-
     client.register()
     client.receive_aes_key()
     client.send_aes_key()
@@ -417,6 +419,5 @@ def main():
 
 # Todo: support for multiple clients
 if __name__ == "__main__":
-    # print("Hello World")
+    print("Hello World")
     main()
-

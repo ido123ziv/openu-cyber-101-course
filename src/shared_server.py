@@ -160,7 +160,9 @@ def create_iv():
 def create_random_byte_key(size: int):
     return get_random_bytes(size)
 
+
 def name_generator():
     name = ''.join(random.choices(string.ascii_lowercase, k=random.randint(3, 5)))
     password = name[0].upper() + name[0].lower() + "123456!"
     return {"name": name, "password": password}
+
