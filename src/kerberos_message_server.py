@@ -3,6 +3,7 @@ import struct
 import threading
 from shared_server import *
 import socket
+from base64 import b64decode
 
 SERVER_FILE = "msg.info"
 
@@ -65,7 +66,8 @@ class KerberosMessageServer:
             self._name = server["name"]
             self._uuid = server["uuid"]
             self._version = get_version()
-            self._key = base64.b64decode(server["key"]) # a symmetric key between message server and auth server
+            self._key = server["key"]
+
             self._lock = threading.Lock()
             self._clients = {}
         except Exception as e:
@@ -127,52 +129,41 @@ class KerberosMessageServer:
         :return: response code whether succeeded or not
         """
         try:
-            authenticator = request["payload"]["authenticator"]
-            ticket = request["payload"]["ticket"]
-            aes_key = ticket.decode().split('|')[-2:-1] # the symetric key between message server and client
-            self._clients.add({
-                "client_id": decrypt_aes(authenticator["clientID"], aes_key),
-                "key": aes_key,
-                "auth_iv": authenticator["authenticatorIV"]
-            })
+            ticket = request.get("ticket")
+            authenticator = request.get("authenticator")
+            aes_key = decrypt_ng(self.key, ticket["aes_key"], ticket["ticket_iv"])
+            client_id = ticket.get("client_id")
+            recieved_client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
+
+            print(f"ticket client id: {client_id}\nauthenticator client id: {recieved_client_id}")
+
+            self._clients[client_id] = {
+                "key": aes_key
+            }
+
             return dict(Code=1604)
         except Exception as e:
             print(str(e))
             return default_error()
 
-    def find_client_by_iv(self, message_iv):
-        """
-        This method finds a client in the list by the IV given
-        :param message_iv: IV used for encrypting the ticket
-        :return: client details, {} if error found
-        """
-        try:
-            clients_ivs = [x.get("auth_iv") for x in self._clients]
-            ind = clients_ivs.index(message_iv)
-            return self._clients[ind]
-        except ValueError as e:
-            print("Client Not registered")
-            return {}
-        except IndexError as e:
-            print("Client not in list")
-            return {}
-
-    def print_message(self, request):
+    def print_message(self, client_id, request):
         """
         Prints a user message
+        :param client_id:
         :param request: a dict with message details
         :return: success code
         """
         try:
+            if len(request["messageContent"]) != request["messageSize"]:
+                raise ValueError("Invalid Message, doesn't match size")
             # TODO: check if message size matches the payload
             message = request["messageContent"]
-            # TODO: restore this
-            # client_key = self.find_client_by_iv(request["messageIV"])
-            # if client_key == {}:
-            #     raise ValueError("User Not Found")
-            # decrypted_message = decrypt_aes(message, client_key)
-            # print(decrypted_message)
-            print(message)
+            if client_id not in self._clients.keys():
+                raise ValueError("Unregistered User")
+            client_key = self._clients[client_id]["key"]
+
+            decrypted_message = decrypt_ng(client_key, message, request["messageIV"]).decode("utf-8")
+            print("decrypted message: " + decrypted_message)
             return dict(Code=1605)
         except Exception as e:
             print("print_message error: " + str(e))
@@ -208,21 +199,6 @@ class KerberosMessageServer:
         finally:
             client_socket.close()
             print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
-        # self.get_and_decrypt_key()
-        # self.print_message()
-
-    def test_client(self, request={}):
-        """
-       Generates temporarily client
-       :param request:
-       :return: client name
-       """
-        if request is None or request == {}:
-            client = name_generator()
-        else:
-            client = request.get('client')
-        print(f"see client: {client}")
-        return client
 
     def handle_client_request(self, request):
         """
@@ -234,17 +210,24 @@ class KerberosMessageServer:
             if not request:
                 raise NameError("request is empty!")
             print(f"Got Request: {request}")
+            try:
+                payload = json.loads(request["payload"])
+            except Exception as e:
+                raise ValueError("Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
             code = request["header"]["code"]
             if code == 1028:
-                return self.get_and_decrypt_key(request["payload"])
+                return self.get_and_decrypt_key(payload)
             elif code == 1029:
                 try:
                     payload = json.loads(request["payload"])
-                    return self.print_message(payload)
+                    return self.print_message(request["header"]["clientID"], payload)
                 except Exception as e:
-                    raise ValueError("Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
+                    raise ValueError(
+                        "Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
             else:
                 raise ValueError("Not Valid request code")
+        except KeyError as e:
+            print("Invalid request. \nRequest: {}\nError: {}".format(request, str(e)))
         except Exception as e:
             print("handle_client_request error: " + str(e))
             return {"code": default_error()}
@@ -274,13 +257,7 @@ class KerberosMessageServer:
         except Exception as e:
             print(f"Error: {e}")
         finally:
-            server.close()
-        pass
-        # while True:
-        #     client_request = self.receive_client_request()
-        #     if client_request:
-        #         thread = threading.Thread(target=self.handle_client_request, args=(client_request,))
-        #         thread.start()
+            client_socket.close()
 
 
 def main():
@@ -299,5 +276,4 @@ def main():
 
 
 if __name__ == "__main__":
-    print("Hello World")
     main()

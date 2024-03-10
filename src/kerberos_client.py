@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 from datetime import datetime
 
@@ -329,50 +330,45 @@ class KerberosClient:
         except Exception as e:
             print("Caught Error: " + str(e))
 
-    def send_aes_key(self, aes_key):
+    def send_aes_key(self, server=SERVER_ID):
         """
         sends an authenticator and a ticket to the message server.
-        :param aes_key: AES Symmetric Key.
+        :param server: messaging server id
         """
         try:
-            uuid = self.get_client_info()["uuid"]
-            authenticator, authenticatorSize = self.create_authenticator(uuid)
+            authenticator = self.create_authenticator(server, self.client_id)
+            ticket = self.ticket
+            payload = {
+                "authenticator": authenticator,
+                "ticket": ticket
+            }
             request = {
                 "header": {
-                    "clientID": uuid,
+                    "clientID": self.client_id,
                     "version": self.version,
                     "code": 1028,
-                    "payloadSize": authenticatorSize + len(self.ticket)
+                    "payloadSize": len(json.dumps(payload))
                 },
-                "payload":{
-                    "authenticator": authenticator,
-                    "ticket": self.ticket
-                }
+                "payload": json.dumps(payload)
             }
-            response = msgserver.get_and_decrypt_key(request)
-            if response == 1609: # error code
-                print(ERROR_MESSAGE)
-                exit(1)
+            self.send_message_to_server(request, server="msg")
         except Exception as e:
-            print(e)
-            exit(1)
+            print("send_aes_key: {}".format(str(e)))
 
     def send_message_for_print(self, message: str):
         """
         encrypts a given message and sends it to the message server.
         :param message: a message to encrypt.
         """
-        nonce = create_nonce()
-        encrypted_message = message.strip()
+        encrypted_message = encrypt_ng(self._aes_key, dict(encrypted_data=message.encode()))
         payload = {
-            "messageSize": len(encrypted_message),
-            # "messageIV": create_iv(),
-            "messageIV": str(create_iv()),
-            "messageContent": encrypted_message
+            "messageSize": len(encrypted_message["encrypted_data"]),
+            "messageIV": encrypted_message["iv"],
+            "messageContent": encrypted_message["encrypted_data"]
         }
         request = {
             "header": {
-                "clientID": "client_id12345678",  # the server will ignore this field
+                "clientID": self.client_id,
                 "version": self.version,
                 "code": 1029,
                 "payloadSize": len(json.dumps(payload))
@@ -391,6 +387,33 @@ class KerberosClient:
             print(f"Error: {str(e)}")
             print(ERROR_MESSAGE)
 
+    def create_authenticator(self, server_id, client_id):
+
+        """
+        creates an authenticator using an AES key.
+        :param client_id: client unique id.
+        :param server_id: server unique id.
+        :return: the authenticator that was created.
+        """
+        nonce = create_nonce()
+        creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        unencrypted_data = {
+            "version": str(self.version).encode(),
+            "client_id": client_id.encode(),
+            "server_id": server_id.encode(),
+            "timestamp": creation_time.encode(),
+            "nonce": nonce
+        }
+        encrypted_data = encrypt_ng(self._aes_key, unencrypted_data)
+
+        return {
+            "authenticatorIV": encrypted_data["iv"],
+            "version": encrypted_data["version"],
+            "clientID": encrypted_data["client_id"],
+            "serverID": encrypted_data["server_id"],
+            "creationTime": encrypted_data["timestamp"]
+        }
+
 
 def main():
     """
@@ -403,9 +426,18 @@ def main():
     client.register()
     client.receive_aes_key()
     client.send_aes_key()
-    while True:
-        client.send_message()
+    client.send_message_for_print("Message!")
+    try:
+        while True:
+            message = input("What to send to server? ")
+            client.send_message_for_print(message)
+    except KeyboardInterrupt as e:
+        print("Thanks for playing")
+
 
 
 if __name__ == "__main__":
     main()
+"""
+b'\xb4I\xc9\x80\xbe\x1a\x9d1Ns\xa5J\x99|\xc6U'
+"""

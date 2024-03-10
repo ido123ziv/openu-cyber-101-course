@@ -112,12 +112,12 @@ class KerberosAuthServer:
         print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
 
         session_key = create_random_byte_key(16)
-        client_key = encrypt_ng(bytes_key, session_key, nonce=nonce)
+        client_key = encrypt_ng(bytes_key, {"encrypted_data": session_key, "nonce": nonce})
 
         creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
 
-        ticket_key = encrypt_ng(session_key, session_key, time=expiration_time.encode())
+        ticket_key = encrypt_ng(self.message_server.get("key"), {"encrypted_data": session_key, "time": expiration_time.encode()})
 
         ticket = self.generate_ticket(client_id, server_id,  creation_time)
         ticket["ticket_iv"] = ticket_key["iv"]
@@ -141,7 +141,6 @@ class KerberosAuthServer:
         :return: tgt
         """
         return {
-            # TODO: change to message server version
             "version": self.version,
             "client_id": client_id,
             "server_id": server_id,
@@ -340,8 +339,8 @@ def load_clients():
                 raise LookupError
             clients = []
             for row in clients_list:
+                # parsing this:
                 """
-                parsing this:
                 clientID: 219612343443330567787200566001537885281 Name: alice PasswordHash: 8a5eba0ab714cbcd4f314334f073c446c3092192de2e40271203a722f41648a5 LastSeen: 2024-01-28 22:34:33
                 """
                 client = row.split(" ")

@@ -42,7 +42,7 @@ def get_message_servers(write=False):
             msg_srv["port"] = message_server[0].split(':')[1].strip()
             msg_srv["name"] = message_server[1].strip()
             msg_srv["uuid"] = message_server[2].strip()
-            msg_srv["key"] = message_server[3].strip()
+            msg_srv["key"] = b64decode(message_server[3].strip())
             return msg_srv
     except Exception as e:
         print(str(e))
@@ -87,30 +87,21 @@ def encrypt_aes(aes_key, nonce, data):
         return b64encode(nonce + ciphertext)
 
 
-def encrypt_ng(key, data, nonce=None, time=None):
+def encrypt_ng(key, data):
     """
     receives a key nonce and data and returns a tuple of iv, nonce and data encrypted
     :param key: key used for encryption
-    :param data: data to encrypt
-    :param nonce: (optional) nonce to encrypt using the same key
-    :param time: (optional)  time of the encryption
-    :return:
+    :param data: dict of data to encrypt
+    :return: encrypted_data as dict
     """
     cipher = AES.new(key, AES.MODE_CBC)
-    ct_bytes = cipher.encrypt(pad(data, AES.block_size))
     iv = b64encode(cipher.iv).decode('utf-8')
-    ct = b64encode(ct_bytes).decode('utf-8')
-    encrypted_struct = {"iv": iv, "encrypted_data": ct}
-    if nonce is not None:
-        encrypted_nonce = cipher.encrypt(pad(nonce, AES.block_size))
-        nonce_str = b64encode(encrypted_nonce).decode('utf-8')
-        encrypted_struct["nonce"] = nonce_str
-    if time is not None:
-        encrypted_time = cipher.encrypt(pad(time, AES.block_size))
-        time_str = b64encode(encrypted_time).decode('utf-8')
-        encrypted_struct["time"] = time_str
-
-    print(json.dumps({'iv': iv, 'ciphertext': ct}))
+    encrypted_struct = dict(iv=iv)
+    for key, value in data.items():
+        ct_bytes = cipher.encrypt(pad(value, AES.block_size))
+        ct = b64encode(ct_bytes).decode('utf-8')
+        encrypted_struct[key] = ct
+    print(json.dumps(encrypted_struct))
     return encrypted_struct
 
 

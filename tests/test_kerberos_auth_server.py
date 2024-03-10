@@ -80,6 +80,7 @@ def test_unregistered_user(server):
     send_to_server(server, client_request, 1600)
 
 
+# TODO: fix why not raising errors
 def test_incorrect_password(server):
     try:
         clients = server.clients()
