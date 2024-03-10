@@ -1,72 +1,166 @@
+import json
 from datetime import datetime
 
-from kerberos_auth_server import KerberosAuthServer as authserver
-from kerberos_message_server import KerberosMessageServer as msgserver
+import struct
+# from kerberos_auth_server import KerberosAuthServer as authserver
+# from kerberos_message_server import KerberosMessageServer as msgserver
+
+
 from shared_server import *
+import socket
 
 CLIENT_FILE = "me.info"
 ERROR_MESSAGE = "Server responded with an error."
 SERVER_ID = "hmd7dkd8r7dje711"
+SERVERS_FILE = "srv.info"
+
+
+def read_servers_info():
+    """
+    reads from {} the servers information and stores to memory
+    :return: a dict with both auth and messaging servers ip and port
+    """.format(SERVERS_FILE)
+    try:
+        with open(SERVERS_FILE, 'r') as servers_file:
+            servers_details = servers_file.readlines()
+            # TODO: add checks for validation
+            auth_details = servers_details[0].split(':')
+            msg_details = servers_details[1].split(':')
+            return {
+                "auth": {
+                    "ip": auth_details[0],
+                    "port": int(auth_details[1].strip())
+                },
+                "msg": {
+                    "ip": msg_details[0],
+                    "port": int(msg_details[1].strip())
+                }
+            }
+    except Exception as e:
+        print(str(e))
+        exit(1)
+
+
+def get_client_info():
+    """
+    :return: load current client from file
+    """
+    try:
+        with open(CLIENT_FILE, 'r') as client_file:
+            data = client_file.readlines()
+            return {"username": data[0].strip(), "uuid": data[1].strip()}
+    except FileNotFoundError as e:
+        print(str(e))
+        return e
+    except IndexError as e:
+        print(str(e))
+        return e
+
 
 class KerberosClient:
     """    
     This class represents a client used by the kerberos protocol.
     """
-    def __init__(self):
-        self._version = 24
-        self._aes_key = None # a symetric key between client and message server
-        self._ticket = None 
-        self._sha256 = None # a symetric key between client and auth server
 
+    def __init__(self):
+        servers = read_servers_info()
+        self._auth_server = servers.get("auth")
+        self._msg_server = servers.get("msg")
+        self._client_id = None
+        self._version = 24
+        self._aes_key = None # a symmetric key between client and message server
+        self._ticket = None
+        self._sha256 = None # a symmetric key between client and auth server
 
     @property
     def version(self):
         """
-        getter for version property 
+        getter for version property
         :return: the client's version
         """
         return self._version
-    
 
     @property
     def aes_key(self):
         """
-        getter for aes_key property 
+        getter for aes_key property
         :return: the aes key
         """
         return self._aes_key
-    
 
     @property
     def ticket(self):
         """
-        getter for ticket property 
+        getter for ticket property
         :return: the ticket for the message server
         """
         return self._ticket
-    
 
     @property
     def sha256(self):
         """
-        getter for sha256 property 
+        getter for sha256 property
         :return: the passwordHash
         """
         return self._sha256
-
-
-    def get_client_info(self):
+    def create_sha256(self, password):
         """
-        reads client's name and uuid from 'me.info' file.
-        :return: a dict containing the name and the uuid. 
+        :param password: client password
+        :return: saves sha of password
         """
+
+        self._sha256 = str(create_password_sha(password)).encode()[32:]
+
+    @property
+    def client_id(self):
+        """
+        :return: client id in system
+        """
+        return self._client_id
+
+    def __client_id__(self, uuid):
+        """
+        :param uuid: server's response new uuid
+        :return: saves uuid to system
+        """
+        self._client_id = uuid
+
+    def send_message_to_server(self, message: dict, server="auth"):
+        """
+        This method uses the socket interface to interact with the servers, auth server and message server
+        :param message: dict representing the request to server according to the accepted format.
+        :param server: server kind -> default is auth. for message pass server="msg"
+        :return: server's response
+        """
+
+        if server != "auth":
+            server_ip = self._msg_server.get("ip")
+            server_port = self._msg_server.get("port")
+        else:
+            server_ip = self._auth_server.get("ip")
+            server_port = self._auth_server.get("port")
         try:
-            with open(CLIENT_FILE, 'r') as client_file:
-                data = client_file.readlines()
-                return {"username": data[0], "uuid": data[1]}
-        except Exception as e:
-            return e
 
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.connect((server_ip, server_port))
+        except socket.error as e:
+            print("Socket error -> " + str(e))
+            exit(1)
+        try:
+            header_data = struct.pack('<16sBH I',  str.encode(message["header"]["clientID"]), message["header"]["version"], message["header"]["code"], message["header"]["payloadSize"])
+
+            client.send(header_data + message["payload"].encode("utf-8"))
+            response = client.recv(1024)
+            response = response.decode("utf-8")
+            print(f"Received: {response}")
+            return response
+        except KeyError as e:
+            print(f"Wrong input of key - {e}")
+        except Exception as e:
+            print(f"Error: {e}")
+        finally:
+            client.close()
+            print("Connection to server closed")
 
     def create_authenticator(self, uuid):
         """
@@ -91,94 +185,154 @@ class KerberosClient:
             "creationTime": encrypted_timestamp
         }, authenticatorSize
 
-
     def register(self):
         """
         sends a register request to the auth server.
-        when the client's info ('me.info') doesn't exist, fetch it as input.
+        :param username: string representing a username.
         """
         try:
-            client_info = self.get_client_info()
+            client_info = get_client_info()
+            if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
+                raise client_info  # Raises the caught exception to handle it in the except block
             username = client_info["username"]
             uuid = client_info["uuid"]
-        except FileNotFoundError as e:
-            print(e)
+            self.__client_id__(uuid)
+            if self.sha256 is None:
+                password = input("Please retype your password: ")
+                self.validate_existing_user(uuid, username, password)
+        except (FileNotFoundError, IndexError) as e:
+            print(f"Unable to find client information or invalid format in '{CLIENT_FILE}': {e}")
+            # Prompting for user input if there is an issue with the client file
             username = input("Enter username: ")
             password = input("Enter password: ")
-            request = {
-                "header":{
-
-                    "clientID": "clientID", # the server will ignore this field
-                    "version": self.version,
-                    "code": 1024,
-                    "payloadSize": len(username) + len(password)
-                },
-                "payload":{
-                    "name": username,
-                    "password": password
-                }
-            }
-            try:
-                response = authserver.register(request)
-                if response["code"] == 1601: # registration failed code
-                    print(response["payload"])
-                    exit(1)
-                uuid = response["payload"]
-            except ValueError as e:
-                print(e)
-                exit(1)
-            self.sha256 = create_password_sha(password)
-            with open(CLIENT_FILE, 'w') as client_file:
-                client_file.writelines([username, uuid])
-            
-            print("Client registered successfully.")
-            print(f"Client info: {self.get_client_info()}")
+            self.attempt_registration(username, password)
         except Exception as e:
-            print(e)
-            print("Unsuccessful registration.")
-            exit(1)
+            print(f"Caught Exception: {str(e)}")
+        else:
+            print(f"Successfully registered with uuid: {self.client_id}")
 
+    def validate_existing_user(self, client_id: str, username: str, password: str):
+        """
+        Validates if existing user is legit by comparing password sha using auth server
+        :param client_id: stored client id
+        :param username: stored username
+        :param password: new input password
+        :return: saves new sha or execption
+        """
+        payload = {
+            "name": username,
+            "password": password
+        }
+        request = {
+            "header": {
+                "clientID": client_id,
+                "version": self.version,
+                "code": 1024,
+                "payloadSize": len(json.dumps(payload))
+            },
+            "payload": json.dumps(payload)
+        }
+        try:
+            response = self.send_message_to_server(request)
+            response_data = json.loads(response)
+            if "error" in response_data["payload"].lower() or response_data["code"] == 1601:
+                raise ValueError("Server error: " + response_data["payload"])
+            if response_data["code"] == 1601:  # registration failed code
+                print(response_data["payload"])
+                exit(1)
+            self.create_sha256(password)
+        except json.JSONDecodeError:
+            print("Not valid server response")
+        except ValueError as e:
+            print("Caught Value Error when validating password: " + str(e))
+        except Exception as e:
+            print(f"Unexpected registration error! " + str(e))
+
+    def attempt_registration(self, username: str, password: str):
+        """
+        Attempts to register the client with the server and handle the response.
+        :param username: new username
+        :param password:
+        :return:
+        """
+        payload = {
+            "name": username,
+            "password": password
+        }
+        request = {
+            "header": {
+                "clientID": "client_id12345678",  # the server will ignore this field
+                "version": self.version,
+                "code": 1024,
+                "payloadSize": len(json.dumps(payload))
+            },
+            "payload": json.dumps(payload)
+        }
+        try:
+            response = self.send_message_to_server(request)
+            response_data = json.loads(response)
+            if "error" in response_data["payload"].lower():
+                raise ValueError("Server error: " + response_data["payload"])
+            if len(response_data["payload"]) < 16:
+                raise ValueError("Server error, invalid client id")
+            if response_data["code"] == 1601:  # registration failed code
+                print(response_data["payload"])
+                exit(1)
+            self.create_sha256(password)
+            self.__client_id__(response_data["payload"])
+            with open(CLIENT_FILE, 'w') as client_file:
+                client_file.writelines([username + "\n", self.client_id])
+            print("Registration attempt succeeded.")
+        except json.JSONDecodeError:
+            print("Not valid server response")
+        except ValueError as e:
+            print("Caught Value Error when registering to server: " + str(e))
+        except Exception as e:
+            print(f"registration error! " + str(e))
 
     def receive_aes_key(self):
         """
-        receives a symetric key between client and message server,
-        and a ticket for the message server.
+        receives an aes key and a ticket to a message server.
         decrypts the key and saves it along with the ticket for future use.
         """
         try:
-            client_info = self.get_client_info()
-            uuid = client_info["uuid"]
-            nonce = create_nonce()
+            # nonce = create_nonce()
+            nonce = str(create_nonce())
+            payload = {
+                "serverID": SERVER_ID,
+                "nonce": nonce
+            }
             request = {
-                "header":{
-                    "clientID": uuid,
+                "header": {
+                    "clientID": self.client_id,
                     "version": self.version,
                     "code": 1027,
-                    "payloadSize": len(SERVER_ID) + len(nonce)
                 },
-                "payload":{
-                    "serverID": SERVER_ID,
-                    "nonce": nonce
-                }
+                "payload": json.dumps(payload)
             }
+            request["header"]["payloadSize"] = len(json.dumps(payload))
+            response = self.send_message_to_server(request)
+            response_data = json.loads(response)["payload"]
+            encrypted_key = response_data["encrypted_key"]
+            ticket = response_data["ticket"]
             try:
-                response = authserver.generate_session_key(request)
-                encrypted_key = response["aes_key"]
-                ticket = response["ticket"]
+                decrypted_key = decrypt_ng(self.sha256, encrypted_key["aes_key"], encrypted_key["encrypted_key_iv"])
+                if isinstance(decrypted_key, Exception):  # Checks if an error occurred while getting client info
+                    raise decrypted_key
+                self._aes_key = decrypted_key
+                self._ticket = ticket
             except ValueError as e:
-                print(e)
-                exit(1)
-            decrypted_key = str(decrypt_aes(encrypted_key, self.sha256))
-            self.aes_key = decrypted_key
-            self.ticket = ticket
+                print("Value Error: " + str(e))
+                print(ERROR_MESSAGE)
+        except json.JSONDecodeError as e:
+            print("Response from server is not valid \n" + ERROR_MESSAGE)
         except Exception as e:
-            print(e)
-            exit(1)
-            
+            print("Caught Error: " + str(e))
 
-    def send_aes_key(self):
+    def send_aes_key(self, aes_key):
         """
         sends an authenticator and a ticket to the message server.
+        :param aes_key: AES Symmetric Key.
         """
         try:
             uuid = self.get_client_info()["uuid"]
@@ -203,44 +357,46 @@ class KerberosClient:
             print(e)
             exit(1)
 
-
-    def send_message(self):
+    def send_message_for_print(self, message: str):
         """
-        encrypts the input message and sends it to the message server.
+        encrypts a given message and sends it to the message server.
+        :param message: a message to encrypt.
         """
-        message = input("Type a message for the server: ")
+        nonce = create_nonce()
+        encrypted_message = message.strip()
+        payload = {
+            "messageSize": len(encrypted_message),
+            # "messageIV": create_iv(),
+            "messageIV": str(create_iv()),
+            "messageContent": encrypted_message
+        }
+        request = {
+            "header": {
+                "clientID": "client_id12345678",  # the server will ignore this field
+                "version": self.version,
+                "code": 1029,
+                "payloadSize": len(json.dumps(payload))
+            },
+            "payload": json.dumps(payload)
+        }
         try:
-            client_info = self.get_client_info()
-            uuid = client_info["uuid"]
-            nonce = create_nonce()
-            encrypted_message = str(encrypt_aes(self.aes_key, nonce, message))
-            encrypted_message_len = len(encrypted_message)
-            iv = create_iv()
-            request = {
-                "header": {
-                    "clientID": uuid,
-                    "version": self.version,
-                    "code": 1029,
-                    "payloadSize": len(encrypted_message_len) + len(iv) + encrypted_message_len
-                },
-                "payload":{
-                    "messageSize": encrypted_message_len,
-                    "messageIV": iv,
-                    "messageContent": encrypted_message
-                }
-            }
-            try:
-                msgserver.receive_client_request(request)
-            except ValueError as e:
-                print(ERROR_MESSAGE)
-                exit(1)
+            print(f"Sending: {json.dumps(request)}")
+            response = self.send_message_to_server(request, server="msg")
+            print(response)
             print("Message sent.")
-        except Exception as e:
-            print(e)
+        except ValueError as e:
+            print(ERROR_MESSAGE)
             exit(1)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            print(ERROR_MESSAGE)
 
 
 def main():
+    """
+    Main function for creation of a client
+    :return:
+    """
     client = KerberosClient()
     print(f"I'm a client!")
     print(f"my version is {client.version}")

@@ -1,6 +1,8 @@
-import base64
+import json
+import struct
 import threading
 from shared_server import *
+import socket
 
 SERVER_FILE = "msg.info"
 
@@ -56,19 +58,23 @@ class KerberosMessageServer:
         """
         constructor
         """
-        self._key = None
         try:
             server = get_message_servers()
-            self._port = server["port"]
+            self._port = int(server["port"])
+            self._ip = server["ip"]
             self._name = server["name"]
             self._uuid = server["uuid"]
-            base64.decode(server["key"], self._key)
             self._version = get_version()
+            self._key = base64.b64decode(server["key"]) # a symmetric key between message server and auth server
             self._lock = threading.Lock()
             self._clients = {}
         except Exception as e:
-            print(str(e))
+            print("Init error: " + str(e))
             default_error()
+
+    @property
+    def ip(self):
+        return self._ip
 
     @property
     def version(self):
@@ -121,14 +127,13 @@ class KerberosMessageServer:
         :return: response code whether succeeded or not
         """
         try:
-            ticket = request.get("Ticket")
-            authenticator = request("Authenticator")
-            aes_key = ticket.decode().split('|')[-2:-1]
-            auth_data = decrypt_aes(authenticator, self.key)
+            authenticator = request["payload"]["authenticator"]
+            ticket = request["payload"]["ticket"]
+            aes_key = ticket.decode().split('|')[-2:-1] # the symetric key between message server and client
             self._clients.add({
-                "client_id": auth_data['client_id'],
+                "client_id": decrypt_aes(authenticator["clientID"], aes_key),
                 "key": aes_key,
-                "auth_iv": auth_data["Authenticator IV"]
+                "auth_iv": authenticator["authenticatorIV"]
             })
             return dict(Code=1604)
         except Exception as e:
@@ -160,31 +165,64 @@ class KerberosMessageServer:
         """
         try:
             # TODO: check if message size matches the payload
-            message = request["Message Content"]
-            client_key = self.find_client_by_iv(request["Message IV"])
-            if client_key == {}:
-                raise ValueError("User Not Found")
-            decrypted_message = decrypt_aes(message, client_key)
-            print(decrypted_message)
+            message = request["messageContent"]
+            # TODO: restore this
+            # client_key = self.find_client_by_iv(request["messageIV"])
+            # if client_key == {}:
+            #     raise ValueError("User Not Found")
+            # decrypted_message = decrypt_aes(message, client_key)
+            # print(decrypted_message)
+            print(message)
             return dict(Code=1605)
         except Exception as e:
-            print(str(e))
+            print("print_message error: " + str(e))
             return default_error()
 
-    def receive_client_request(self, request={}):
+    def receive_client_request(self, client_socket, addr):
+        try:
+            header_data = client_socket.recv(23)
+            if len(header_data) != 23:
+                print("Header size didn't match constraints.")
+                raise ValueError
+
+            # Unpack the header fields using struct
+            client_id, version, code, payload_size = struct.unpack('<16sBH I', header_data)
+            payload_data = client_socket.recv(payload_size)
+            if len(payload_data) != payload_size:
+                print("Payload size didn't match payload, Aborting!.")
+                raise ValueError
+
+            request = {
+                "header": {
+                    "clientID": client_id.decode("utf-8"),
+                    "version": version,
+                    "code": code,
+                    "payloadSize": payload_size
+                },
+                "payload": payload_data.decode("utf-8")
+            }
+            response = self.handle_client_request(request)
+            client_socket.send(json.dumps(response).encode("utf-8"))
+        except Exception as e:
+            print(f"Error when handling client: {e}")
+        finally:
+            client_socket.close()
+            print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+        # self.get_and_decrypt_key()
+        # self.print_message()
+
+    def test_client(self, request={}):
         """
-        Generates temporarily client
-        :param request:
-        :return: client name
-        """
+       Generates temporarily client
+       :param request:
+       :return: client name
+       """
         if request is None or request == {}:
             client = name_generator()
         else:
             client = request.get('client')
         print(f"see client: {client}")
         return client
-        # self.get_and_decrypt_key()
-        # self.print_message()
 
     def handle_client_request(self, request):
         """
@@ -195,22 +233,48 @@ class KerberosMessageServer:
         try:
             if not request:
                 raise NameError("request is empty!")
-            code = request["Header"]["Code"]
+            print(f"Got Request: {request}")
+            code = request["header"]["code"]
             if code == 1028:
-                return self.get_and_decrypt_key(request["Payload"])
+                return self.get_and_decrypt_key(request["payload"])
             elif code == 1029:
-                return self.print_message(request["Payload"])
+                try:
+                    payload = json.loads(request["payload"])
+                    return self.print_message(payload)
+                except Exception as e:
+                    raise ValueError("Payload is not valid JSON. \nPayload:{}\nError:{}".format(request["payload"], str(e)))
             else:
                 raise ValueError("Not Valid request code")
         except Exception as e:
-            print(str(e))
-            return {"Code": default_error()}
+            print("handle_client_request error: " + str(e))
+            return {"code": default_error()}
 
     def start_server(self):
         """
         infinite loop, listening to requests from clients
         :return:
         """
+        # TODO: add methods to check this
+        try:
+            print(f"Message Server Started on port {self.port}")
+            server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # bind the socket to the host and port
+            server.bind((self.ip, self.port))
+            # listen for incoming connections
+            server.listen()
+            print(f"Listening on {self.ip}:{self.port}")
+
+            while True:
+                # accept a client connection
+                client_socket, addr = server.accept()
+                print(f"Accepted connection from {addr[0]}:{addr[1]}")
+                # start a new thread to handle the client
+                thread = threading.Thread(target=self.receive_client_request, args=(client_socket, addr,))
+                thread.start()
+        except Exception as e:
+            print(f"Error: {e}")
+        finally:
+            server.close()
         pass
         # while True:
         #     client_request = self.receive_client_request()
@@ -230,5 +294,10 @@ def main():
     print(f"Port: {server.port}")
     print(f"Version: {server.version}")
     print(f"my uuid is {server.uuid}")
-    print(f"my key is {server.key}")
+    print(f"a shared key between me and the auth server is {server.key}")
     server.start_server()
+
+
+if __name__ == "__main__":
+    print("Hello World")
+    main()
