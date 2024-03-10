@@ -322,24 +322,21 @@ class KerberosClient:
             self.send_message_to_server(request, server="msg")
         except Exception as e:
             print("send_aes_key: {}".format(str(e)))
-            
 
     def send_message_for_print(self, message: str):
         """
         encrypts a given message and sends it to the message server.
         :param message: a message to encrypt.
         """
-        nonce = create_nonce()
-        encrypted_message = message.strip()
+        encrypted_message = encrypt_ng(self._aes_key, dict(encrypted_data=message.encode()))
         payload = {
-            "messageSize": len(encrypted_message),
-            # "messageIV": create_iv(),
-            "messageIV": str(create_iv()),
-            "messageContent": encrypted_message
+            "messageSize": len(encrypted_message["encrypted_data"]),
+            "messageIV": encrypted_message["iv"],
+            "messageContent": encrypted_message["encrypted_data"]
         }
         request = {
             "header": {
-                "clientID": "client_id12345678",  # the server will ignore this field
+                "clientID": self.client_id,
                 "version": self.version,
                 "code": 1029,
                 "payloadSize": len(json.dumps(payload))
@@ -382,8 +379,6 @@ class KerberosClient:
         }
 
 
-
-
 def main():
     """
     Main function for creation of a client
@@ -393,7 +388,13 @@ def main():
     client.register()
     client.receive_aes_key()
     client.send_aes_key()
-    # client.send_message_for_print("Message!")
+    client.send_message_for_print("Message!")
+    try:
+        while True:
+            message = input("What to send to server? ")
+            client.send_message_for_print(message)
+    except KeyboardInterrupt as e:
+        print("Thanks for playing")
 
 
 # Todo: support for multiple clients
