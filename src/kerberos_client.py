@@ -118,9 +118,16 @@ class KerberosClient:
                     "password": password
                 }
             }
-            uuid = authserver.register(request)["Payload"]
+            try:
+                response = authserver.register(request)
+                if response["code"] == 1601: # registration failed code
+                    print(response["payload"])
+                    exit(1)
+                uuid = response["payload"]
+            except ValueError as e:
+                print(e)
+                exit(1)
             self.sha256 = create_password_sha(password)
-
             with open(CLIENT_FILE, 'w') as client_file:
                 client_file.writelines([username, uuid])
             
@@ -154,14 +161,18 @@ class KerberosClient:
                     "nonce": nonce
                 }
             }
-            encrypted_key, ticket = authserver.generate_session_key(request)
-            
+            try:
+                response = authserver.generate_session_key(request)
+                encrypted_key = response["aes_key"]
+                ticket = response["ticket"]
+            except ValueError as e:
+                print(e)
+                exit(1)
             decrypted_key = str(decrypt_aes(encrypted_key, self.sha256))
             self.aes_key = decrypted_key
             self.ticket = ticket
         except Exception as e:
             print(e)
-            print(ERROR_MESSAGE)
             exit(1)
             
 
@@ -184,7 +195,10 @@ class KerberosClient:
                     "ticket": self.ticket
                 }
             }
-            msgserver.get_and_decrypt_key(request)
+            response = msgserver.get_and_decrypt_key(request)
+            if response == 1609: # error code
+                print(ERROR_MESSAGE)
+                exit(1)
         except Exception as e:
             print(e)
             exit(1)
@@ -215,8 +229,11 @@ class KerberosClient:
                     "messageContent": encrypted_message
                 }
             }
-            msgserver.receive_client_request(request)
-
+            try:
+                msgserver.receive_client_request(request)
+            except ValueError as e:
+                print(ERROR_MESSAGE)
+                exit(1)
             print("Message sent.")
         except Exception as e:
             print(e)
