@@ -67,7 +67,6 @@ class KerberosMessageServer:
             self._uuid = server["uuid"]
             self._version = get_version()
             self._key = server["key"]
-
             self._lock = threading.Lock()
             self._clients = {}
         except Exception as e:
@@ -133,6 +132,7 @@ class KerberosMessageServer:
             authenticator = request.get("authenticator")
             aes_key = decrypt_ng(self.key, ticket["aes_key"], ticket["ticket_iv"])
             client_id = ticket.get("client_id")
+            # TODO compare client id if ticket to authenticator
             recieved_client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
 
             print(f"ticket client id: {client_id}\nauthenticator client id: {recieved_client_id}")
@@ -140,10 +140,9 @@ class KerberosMessageServer:
             self._clients[client_id] = {
                 "key": aes_key
             }
-
             return dict(Code=1604)
         except Exception as e:
-            print(str(e))
+            print("get_and_decrypt_key error: " + str(e))
             return default_error()
 
     def print_message(self, client_id, request):
@@ -271,7 +270,7 @@ def main():
     print(f"Port: {server.port}")
     print(f"Version: {server.version}")
     print(f"my uuid is {server.uuid}")
-    print(f"a shared key between me and the auth server is {server.key}")
+    print(f"my key is {server.key}")
     server.start_server()
 
 
