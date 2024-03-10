@@ -1,15 +1,19 @@
 from datetime import datetime
 import json
+from datetime import datetime
+
 import struct
+# from kerberos_auth_server import KerberosAuthServer as authserver
+# from kerberos_message_server import KerberosMessageServer as msgserver
+
 
 from shared_server import *
 import socket
 
 CLIENT_FILE = "me.info"
-SERVERS_FILE = "srv.info"
 ERROR_MESSAGE = "Server responded with an error."
-# TODO use multiple message servers for now leave it
-SERVER_ID = "hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711"
+SERVER_ID = "hmd7dkd8r7dje711"
+SERVERS_FILE = "srv.info"
 
 
 def read_servers_info():
@@ -63,11 +67,64 @@ class KerberosClient:
         servers = read_servers_info()
         self._auth_server = servers.get("auth")
         self._msg_server = servers.get("msg")
-        self._version = get_version()
         self._client_id = None
-        self._aes_key = None
+        self._version = 24
+        self._aes_key = None # a symmetric key between client and message server
         self._ticket = None
-        self._sha256 = None
+        self._sha256 = None # a symmetric key between client and auth server
+
+    @property
+    def version(self):
+        """
+        getter for version property
+        :return: the client's version
+        """
+        return self._version
+
+    @property
+    def aes_key(self):
+        """
+        getter for aes_key property
+        :return: the aes key
+        """
+        return self._aes_key
+
+    @property
+    def ticket(self):
+        """
+        getter for ticket property
+        :return: the ticket for the message server
+        """
+        return self._ticket
+
+    @property
+    def sha256(self):
+        """
+        getter for sha256 property
+        :return: the passwordHash
+        """
+        return self._sha256
+    def create_sha256(self, password):
+        """
+        :param password: client password
+        :return: saves sha of password
+        """
+
+        self._sha256 = str(create_password_sha(password)).encode()[32:]
+
+    @property
+    def client_id(self):
+        """
+        :return: client id in system
+        """
+        return self._client_id
+
+    def __client_id__(self, uuid):
+        """
+        :param uuid: server's response new uuid
+        :return: saves uuid to system
+        """
+        self._client_id = uuid
 
     def send_message_to_server(self, message: dict, server="auth"):
         """
@@ -106,59 +163,28 @@ class KerberosClient:
             client.close()
             print("Connection to server closed")
 
-    @property
-    def client_id(self):
+    def create_authenticator(self, uuid):
         """
-        :return: client id in system
+        creates an authenticator for message server using an AES symetric key.
+        :param uuid: client unique id.
+        :return: the authenticator that was created.
         """
-        return self._client_id
+        nonce = create_nonce()
+        encrypted_version = str(encrypt_aes(self.aes_key, nonce, get_version()))
+        encrypted_client_id = str(encrypt_aes(self.aes_key, nonce, uuid))
+        encrypted_server_id = str(encrypt_aes(self.aes_key, nonce, SERVER_ID))
+        creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        encrypted_timestamp = str(encrypt_aes(self.aes_key, nonce, creation_time))
+        iv = create_iv()
 
-    def __client_id__(self, uuid):
-        """
-        :param uuid: server's response new uuid
-        :return: saves uuid to system
-        """
-        self._client_id = uuid
-
-    @property
-    def version(self):
-        """
-        getter for version property
-        :return: the client's version
-        """
-        return self._version
-
-    @property
-    def aes_key(self):
-        """
-        getter for aes_key property
-        :return: the aes key
-        """
-        return self._aes_key
-
-    @property
-    def ticket(self):
-        """
-        getter for ticket property
-        :return: the ticket for the message server
-        """
-        return self._ticket
-
-    @property
-    def sha256(self):
-        """
-        getter for sha256 property
-        :return: the passwordHash
-        """
-        return self._sha256
-
-    def create_sha256(self, password):
-        """
-        :param password: client password
-        :return: saves sha of password
-        """
-
-        self._sha256 = str(create_password_sha(password)).encode()[32:]
+        authenticatorSize = len(iv) + len(encrypted_version) + len(encrypted_client_id) + len(encrypted_server_id) + len(encrypted_timestamp)
+        return {
+            "authenticatorIV": iv,
+            "version": encrypted_version,
+            "clientID": encrypted_client_id,
+            "serverID": encrypted_server_id,
+            "creationTime": encrypted_timestamp
+        }, authenticatorSize
 
     def register(self):
         """
@@ -212,6 +238,9 @@ class KerberosClient:
             response_data = json.loads(response)
             if "error" in response_data["payload"].lower() or response_data["code"] == 1601:
                 raise ValueError("Server error: " + response_data["payload"])
+            if response_data["code"] == 1601:  # registration failed code
+                print(response_data["payload"])
+                exit(1)
             self.create_sha256(password)
         except json.JSONDecodeError:
             print("Not valid server response")
@@ -247,6 +276,9 @@ class KerberosClient:
                 raise ValueError("Server error: " + response_data["payload"])
             if len(response_data["payload"]) < 16:
                 raise ValueError("Server error, invalid client id")
+            if response_data["code"] == 1601:  # registration failed code
+                print(response_data["payload"])
+                exit(1)
             self.create_sha256(password)
             self.__client_id__(response_data["payload"])
             with open(CLIENT_FILE, 'w') as client_file:
@@ -347,6 +379,10 @@ class KerberosClient:
             print(f"Sending: {json.dumps(request)}")
             response = self.send_message_to_server(request, server="msg")
             print(response)
+            print("Message sent.")
+        except ValueError as e:
+            print(ERROR_MESSAGE)
+            exit(1)
         except Exception as e:
             print(f"Error: {str(e)}")
             print(ERROR_MESSAGE)
@@ -385,6 +421,8 @@ def main():
     :return:
     """
     client = KerberosClient()
+    print(f"I'm a client!")
+    print(f"my version is {client.version}")
     client.register()
     client.receive_aes_key()
     client.send_aes_key()
@@ -397,9 +435,8 @@ def main():
         print("Thanks for playing")
 
 
-# Todo: support for multiple clients
+
 if __name__ == "__main__":
-    print("Hello World")
     main()
 """
 b'\xb4I\xc9\x80\xbe\x1a\x9d1Ns\xa5J\x99|\xc6U'
