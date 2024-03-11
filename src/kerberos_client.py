@@ -11,8 +11,7 @@ import socket
 CLIENT_FILE = f"{FOLDER_NAME}/me.info"
 SERVERS_FILE = f"{FOLDER_NAME}/srv.info"
 ERROR_MESSAGE = "Server responded with an error."
-# TODO use multiple message servers for now leave it
-SERVER_ID = "hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711"
+SERVER_ID = "hmd7dkd8r7dje711"
 
 
 def read_servers_info():
@@ -53,7 +52,6 @@ def get_client_info():
         print(str(e))
         return e
     except IndexError as e:
-        print(str(e))
         return e
 
 
@@ -172,7 +170,6 @@ class KerberosClient:
         """
         sends a register request to the auth server.
         """
-        print("Register")
         try:
             client_info = get_client_info()
             if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
@@ -183,17 +180,20 @@ class KerberosClient:
             if self.sha256 is None:
                 print(f"Welcome back user: {username}, uuid: {uuid}")
                 password = input("Please retype your password: ")
-                self.validate_existing_user(uuid, username, password)
-        except (FileNotFoundError, IndexError) as e:
-            print(f"Unable to find client information or invalid format in '{CLIENT_FILE}': {e}")
+                return self.validate_existing_user(uuid, username, password)
+
+        except (FileNotFoundError, IndexError):
             # Prompting for user input if there is an issue with the client file
             username = input("Enter username: ")
+            if len(username) > 255:
+                return ValueError("Too long username.\nUnsuccessful registration.")
             password = input("Enter password: ")
+            if len(password) > 255:
+                return ValueError("Too long password.\nUnsuccessful registration.")
             self.attempt_registration(username, password)
+            print(f"Successfully registered with uuid: {self.client_id}")
         except Exception as e:
             print(f"Caught Exception: {str(e)}")
-        else:
-            print(f"Successfully registered with uuid: {self.client_id}")
 
     def validate_existing_user(self, client_id: str, username: str, password: str):
         """
@@ -203,8 +203,6 @@ class KerberosClient:
         :param password: new input password
         :return: saves new sha or execption
         """
-        print("existing user registering")
-
         payload = {
             "name": username,
             "password": password
@@ -224,8 +222,9 @@ class KerberosClient:
                 raise response
             response_data = json.loads(response)
             if "error" in response_data["payload"].lower() or response_data["code"] == 1601:
-                raise ValueError("Server error: " + response_data["payload"])
+                return ValueError("Server error: " + response_data["payload"])
             self.create_sha256(password)
+            print("Successfull registration")
         except json.JSONDecodeError:
             print("Not valid server response")
         except ValueError as e:
@@ -259,6 +258,8 @@ class KerberosClient:
             if isinstance(response, Exception):
                 raise response
             response_data = json.loads(response)
+            # print(response_data)
+            # print("ffffffff")
             if "error" in response_data["payload"].lower():
                 raise ValueError("Server error: " + response_data["payload"])
             if len(response_data["payload"]) < 16:
@@ -405,19 +406,24 @@ def main():
     """
     # logging.basicConfig(stream=sys.stdout, level=get_log_level())
     client = KerberosClient()
-    client.register()
+    # try:
+    #     client.register()
+    # except Exception:
+    #     exit(1)
+    response = client.register()
+    while isinstance(response, Exception):
+        print(response)
+        response = client.register()
     client.receive_aes_key()
     client.send_aes_key()
-    client.send_message_for_print("Message!")
     try:
         while True:
             message = input("What to send to server? ")
             client.send_message_for_print(message)
-    except KeyboardInterrupt as e:
-        print("Thanks for playing")
+    except KeyboardInterrupt:
+        print("\nThanks for playing")
 
 
 # Todo: support for multiple clients
 if __name__ == "__main__":
-    print("Hello World")
     main()

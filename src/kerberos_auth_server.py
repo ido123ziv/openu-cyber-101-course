@@ -180,6 +180,7 @@ class KerberosAuthServer:
                     }
                 )
                 add_client_to_file(self.clients)
+                print("Client registered successfully")
                 return {
                     "code": 1600,
                     "version": self.version,
@@ -219,7 +220,7 @@ class KerberosAuthServer:
             "encrypted_key": encrypted_key,
             "ticket": response.get('ticket')
         }
-        # print(f"payload: \n{payload}")
+        print("Symmetric key sent to client")
         return {
             "header": {
                 "code": 1603,
@@ -308,7 +309,7 @@ class KerberosAuthServer:
         :return:
         """
         try:
-            print(f"Server Started on port {self.port}")
+            # print(f"Server Started on port {self.port}")
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # bind the socket to the host and port
             server.bind((self.server_ip, self.port))
@@ -319,7 +320,7 @@ class KerberosAuthServer:
             while True:
                 # accept a client connection
                 client_socket, addr = server.accept()
-                print(f"Accepted connection from {addr[0]}:{addr[1]}")
+                # print(f"Accepted connection from {addr[0]}:{addr[1]}")
                 # start a new thread to handle the client
                 thread = threading.Thread(target=self.receive_client_request, args=(client_socket, addr,))
                 thread.start()
@@ -388,7 +389,7 @@ def main():
     """
     # logging.basicConfig(stream=sys.stdout, level=get_log_level())
     server = KerberosAuthServer()
-    print("Kerberos Server")
+    print("Kerberos Auth Server")
     # logging.log("I'm a Kerberos Server!")
 
     # logging.debug(f"my clients are: {server.clients}")

@@ -143,6 +143,7 @@ class KerberosMessageServer:
             self._clients[client_id] = {
                 "key": aes_key
             }
+            print("Symmetric key accepted")
             return dict(Code=1604)
         except Exception as e:
             print("get_and_decrypt_key error: " + str(e))
@@ -165,7 +166,7 @@ class KerberosMessageServer:
             client_key = self._clients[client_id]["key"]
 
             decrypted_message = decrypt_ng(client_key, message, request["messageIV"]).decode("utf-8")
-            print("decrypted message: " + decrypted_message)
+            print("Received message: " + decrypted_message)
             return dict(Code=1605)
         except Exception as e:
             print("print_message error: " + str(e))
@@ -241,7 +242,7 @@ class KerberosMessageServer:
         """
         # TODO: add methods to check this
         try:
-            print(f"Message Server Started on port {self.port}")
+            # print(f"Message Server Started on port {self.port}")
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # bind the socket to the host and port
             server.bind((self.ip, self.port))
@@ -252,7 +253,7 @@ class KerberosMessageServer:
             while True:
                 # accept a client connection
                 client_socket, addr = server.accept()
-                print(f"Accepted connection from {addr[0]}:{addr[1]}")
+                # print(f"Accepted connection from {addr[0]}:{addr[1]}")
                 # start a new thread to handle the client
                 thread = threading.Thread(target=self.receive_client_request, args=(client_socket, addr,))
                 thread.start()
@@ -269,7 +270,7 @@ def main():
     """
     server = KerberosMessageServer()
     # logging.basicConfig(stream=sys.stdout, level=get_log_level())
-    print("I'm a messages server!")
+    print("Kerberos Message Server")
     # print(f"My name is {server.name}")
     # print(f"Port: {server.port}")
     # print(f"Version: {server.version}")
