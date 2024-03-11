@@ -116,22 +116,25 @@ class KerberosAuthServer:
         # print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
 
         session_key = create_random_byte_key(16)
-        client_key = encrypt_ng(bytes_key, {"encrypted_data": session_key, "nonce": nonce})
+        # client_key = encrypt_ng(bytes_key, {"encrypted_data": session_key, "nonce": nonce})
+        client_nonce, nonce_iv = encrypt_aes_ng(bytes_key, nonce)
+        client_key, client_iv = encrypt_aes_ng(bytes_key, session_key)
 
         creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
 
-        ticket_key = encrypt_ng(self.message_server.get("key"), {"encrypted_data": session_key, "time": expiration_time.encode()})
+        ticket_key,ticket_key_iv = encrypt_aes_ng(self.message_server.get("key"), session_key)
+        ticket_time,ticket_time_iv = encrypt_aes_ng(self.message_server.get("key"), expiration_time.encode())
 
         ticket = self.generate_ticket(client_id, server_id,  creation_time)
-        ticket["ticket_iv"] = ticket_key["iv"]
-        ticket["aes_key"] = ticket_key["encrypted_data"]
-        ticket["expiration_time"] = ticket_key["time"]
+        ticket["ticket_iv"] = ticket_key_iv
+        ticket["aes_key"] = ticket_key
+        ticket["expiration_time"] = ticket_time
 
         return {
-            "encrypted_key_iv": client_key["iv"],
-            "nonce": client_key["nonce"],
-            "aes_key": client_key["encrypted_data"],
+            "encrypted_key_iv": client_iv,
+            "nonce": client_nonce,
+            "aes_key": client_key,
             "ticket": ticket
         }
 
@@ -208,8 +211,8 @@ class KerberosAuthServer:
         nonce = ast.literal_eval(received_payload["nonce"])
         response = self.generate_session_key(client_id,
                                              self.message_server.get("uuid"), nonce)
-        # print("Created session key!")
-        # print(f"generate_session_key: {response}")
+        print("Created session key!")
+        print(f"generate_session_key: {response}")
         encrypted_key = {
             "aes_key": response.get('aes_key'),
             "nonce": response.get('nonce'),
@@ -219,7 +222,7 @@ class KerberosAuthServer:
             "encrypted_key": encrypted_key,
             "ticket": response.get('ticket')
         }
-        # print(f"payload: \n{payload}")
+        print(f"payload: \n{payload}")
         return {
             "header": {
                 "code": 1603,

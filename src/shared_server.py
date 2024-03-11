@@ -113,8 +113,24 @@ def encrypt_ng(key, data):
     # print(json.dumps(encrypted_struct))
     return encrypted_struct
 
+def encrypt_aes_ng(key, data):
+    """
+    receives a key nonce and data and returns a tuple of iv, nonce and data encrypted
+    :param key: key used for encryption
+    :param data: dict of data to encrypt
+    :return: encrypted_data as dict
+    """
+    cipher = AES.new(key, AES.MODE_CBC)
+    iv = b64encode(cipher.iv).decode('utf-8')
 
-def decrypt_ng(key, data, iv):
+    ct_bytes = cipher.encrypt(pad(data, AES.block_size))
+    ct = b64encode(ct_bytes).decode('utf-8')
+    print("encrypt_aes_ng " + iv + " " + ct)
+    return str(iv+ct), iv
+    # print(json.dumps(encrypted_struct))
+
+
+def decrypt_ng(key, data, iv=None):
     """
 
     :param key:
@@ -123,8 +139,12 @@ def decrypt_ng(key, data, iv):
     :return:
     """
     try:
-        parse_iv = b64decode(iv)
-        parse_data = b64decode(data)
+        if iv is not None:
+            parse_iv = b64decode(iv)
+        else:
+            parse_iv=b64decode(data[:24])
+        parse_data = b64decode(data[24:])
+        print(data[24:], data[:24])
         cipher = AES.new(key, AES.MODE_CBC, parse_iv)
         pt = unpad(cipher.decrypt(parse_data), AES.block_size)
         # print("The message was: ", pt)
