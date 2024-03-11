@@ -1,5 +1,6 @@
 import json
 import string
+import os
 import random
 # import logging
 # import os
@@ -15,9 +16,9 @@ from base64 import b64encode, b64decode
 #         return logging.DEBUG
 #     return logging.INFO
 
-
-PORT_FILE = "port.info"
-MESSAGE_SERVER_FILE = "msg.info"
+FOLDER_NAME=os.path.dirname(os.path.abspath(__file__))
+PORT_FILE = f"{FOLDER_NAME}/port.info"
+MESSAGE_SERVER_FILE = f"{FOLDER_NAME}/msg.info"
 PROTOCOL_VERSION = 24
 
 
