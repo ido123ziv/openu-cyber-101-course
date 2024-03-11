@@ -8,8 +8,8 @@ import struct
 from shared_server import *
 import socket
 
-CLIENT_FILE = "me.info"
-SERVERS_FILE = "srv.info"
+CLIENT_FILE = f"{FOLDER_NAME}/me.info"
+SERVERS_FILE = f"{FOLDER_NAME}/srv.info"
 ERROR_MESSAGE = "Server responded with an error."
 # TODO use multiple message servers for now leave it
 SERVER_ID = "hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711"
