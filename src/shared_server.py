@@ -125,7 +125,7 @@ def encrypt_aes_ng(key, data):
 
     ct_bytes = cipher.encrypt(pad(data, AES.block_size))
     ct = b64encode(ct_bytes).decode('utf-8')
-    print("encrypt_aes_ng " + iv + " " + ct)
+    # print("encrypt_aes_ng " + iv + " " + ct)
     return str(iv+ct), iv
     # print(json.dumps(encrypted_struct))
 
@@ -144,7 +144,7 @@ def decrypt_ng(key, data, iv=None):
         else:
             parse_iv=b64decode(data[:24])
         parse_data = b64decode(data[24:])
-        print(data[24:], data[:24])
+        # print(data[24:], data[:24])
         cipher = AES.new(key, AES.MODE_CBC, parse_iv)
         pt = unpad(cipher.decrypt(parse_data), AES.block_size)
         # print("The message was: ", pt)

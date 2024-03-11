@@ -211,8 +211,8 @@ class KerberosAuthServer:
         nonce = ast.literal_eval(received_payload["nonce"])
         response = self.generate_session_key(client_id,
                                              self.message_server.get("uuid"), nonce)
-        print("Created session key!")
-        print(f"generate_session_key: {response}")
+        # print("Created session key!")
+        # print(f"generate_session_key: {response}")
         encrypted_key = {
             "aes_key": response.get('aes_key'),
             "nonce": response.get('nonce'),
@@ -222,7 +222,7 @@ class KerberosAuthServer:
             "encrypted_key": encrypted_key,
             "ticket": response.get('ticket')
         }
-        print(f"payload: \n{payload}")
+        # print(f"payload: \n{payload}")
         return {
             "header": {
                 "code": 1603,

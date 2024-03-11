@@ -137,17 +137,17 @@ class KerberosMessageServer:
             authenticator = request.get("authenticator")
             aes_key = decrypt_ng(self.key, ticket["aes_key"], ticket["ticket_iv"])
             ticket_expiration_time = decrypt_ng(self.key, ticket["expiration_time"]).decode("utf-8")
-            print(ticket_expiration_time)
+            # print(ticket_expiration_time)
             ticket_expiration_timef = datetime.strptime(ticket_expiration_time,'%Y-%m-%d %H:%M:%S')
             client_id = ticket.get("client_id")
-            print(json.dumps(authenticator))
+            # print(json.dumps(authenticator))
             # TODO compare client id if ticket to authenticator
             decrypted_authenticator={}
             for k,v in authenticator.items():
                 # print(k)
                 if "iv" not in k.lower():
                     decrypted_value = decrypt_ng(aes_key, v).decode("utf-8")
-                    print(f"{k}->{decrypted_value}")
+                    # print(f"{k}->{decrypted_value}")
                     decrypted_authenticator[k] = decrypted_value
                 # else:
                 #     print(v)
@@ -194,7 +194,7 @@ class KerberosMessageServer:
             if now > self._clients[client_id]["expire_timestamp"]:
                 raise ValueError("Expired Ticket")
             client_key = self._clients[client_id]["key"]
-            print("print message: ")
+            # print("print message: ")
             decrypted_message = decrypt_ng(client_key, message).decode("utf-8")
             print("decrypted message: " + decrypted_message)
             return dict(Code=1605)

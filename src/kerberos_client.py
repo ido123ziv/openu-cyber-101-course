@@ -374,7 +374,7 @@ class KerberosClient:
         try:
             # print(f"Sending: {json.dumps(request)}")
             response = self.send_message_to_server(request, server="msg")
-            # print(response)
+            print("Server response: " + response)
 
         except Exception as e:
             print(f"Error: {str(e)}")
