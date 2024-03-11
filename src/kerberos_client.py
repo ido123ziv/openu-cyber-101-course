@@ -193,7 +193,7 @@ class KerberosClient:
         except Exception as e:
             print(f"Caught Exception: {str(e)}")
         else:
-            print(f"Successfully registered with uuid: {self.client_id}")
+            print(f"User with uuid: {self.client_id}")
 
     def validate_existing_user(self, client_id: str, username: str, password: str):
         """
@@ -230,6 +230,7 @@ class KerberosClient:
             print("Not valid server response")
         except ValueError as e:
             print("Caught Value Error when validating password: " + str(e))
+            self.register()
         except Exception as e:
             print(f"Unexpected registration error! " + str(e))
 
@@ -423,7 +424,7 @@ def main():
     client.register()
     client.receive_aes_key()
     client.send_aes_key()
-    client.send_message_for_print("Message!")
+    # client.send_message_for_print("Message!")
     try:
         while True:
             message = input("What to send to server? ")
