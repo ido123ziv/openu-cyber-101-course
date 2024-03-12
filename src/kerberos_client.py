@@ -50,10 +50,10 @@ def get_client_info():
             data = client_file.readlines()
             return {"username": data[0].strip(), "uuid": data[1].strip()}
     except FileNotFoundError as e:
-        print(str(e))
+        # print(str(e))
         return e
     except IndexError as e:
-        print(str(e))
+        # str(e)
         return e
 
 
@@ -169,32 +169,40 @@ class KerberosClient:
 
         self._sha256 = str(create_password_sha(password)).encode()[32:]
 
-    def register(self):
+    def register(self, username=None):
         """
         sends a register request to the auth server.
         """
-        print("Hello, Welcome To Kerberos!")
-        username = input("Please state your username: ")
+        self._registration_count += 1
+        if self._registration_count > 5:
+            print("Max attempts exceeded!")
+            exit(1)
         try:
-            if self._registration_count > 5:
-                raise ValueError("Max attempts exceeded!")
+
             client_info = get_client_info()
             if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
-                raise client_info  # Raises the caught exception to handle it in the except block
-            if not client_info["username"] == username:
-                os.remove(CLIENT_FILE)
+                raise FileNotFoundError(f"Issue with CLIENT_FILE, user session not saved, contacting server")  # Raises the caught exception to handle it in the except block
+            if username is None:
+                username = input("Please state your username: ")
+            if username is not None and not client_info["username"] == username:
+                if os.path.isfile(CLIENT_FILE):
+                    os.remove(CLIENT_FILE)
                 raise FileNotFoundError("new user request")
+            username = client_info["username"]
+
             uuid = client_info["uuid"]
             self.__client_id__(uuid)
-            self._registration_count += 1
             if self.sha256 is None:
                 print(f"Welcome back user: {username}, uuid: {uuid}")
                 password = input("Please retype your password: ")
                 self.validate_existing_user(uuid, username, password)
         except (FileNotFoundError, IndexError) as e:
-            print(f"Unable to find client information or invalid format in '{CLIENT_FILE}': {e}")
+            # print(f"Unable to find client information or invalid format in '{CLIENT_FILE}': {e}")
+            # print(f"Unable to find client information or invalid format")
             # Prompting for user input if there is an issue with the client file
-
+            if username is None:
+                print(str(e))
+                username = input("please state your username: ")
             password = input("Enter password: ")
             self.attempt_registration(username, password)
         except ValueError as e:
@@ -240,7 +248,7 @@ class KerberosClient:
             print("Not valid server response")
         except ValueError as e:
             print("Caught Value Error when validating password: " + str(e))
-            self.register()
+            self.register(username)
         except Exception as e:
             print(f"Unexpected registration error! " + str(e))
 
@@ -251,7 +259,8 @@ class KerberosClient:
         :param password:
         :return:
         """
-        print("new user registration")
+        # print("new user registration")
+        # print(f"username: {username}")
         payload = {
             "name": username,
             "password": password
@@ -283,6 +292,7 @@ class KerberosClient:
             print("Not valid server response")
         except ValueError as e:
             print("Caught Value Error when registering to server: " + str(e))
+            self.register(username)
         except Exception as e:
             print(f"registration error! " + str(e))
 
@@ -447,5 +457,5 @@ def main():
 
 # Todo: support for multiple clients
 if __name__ == "__main__":
-    print("Hello World")
+    print("Hello, Welcome To Kerberos!")
     main()

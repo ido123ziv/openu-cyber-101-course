@@ -164,7 +164,7 @@ class KerberosAuthServer:
                 password_hash = create_password_sha(request["password"])
                 client_index = self.get_clients_names().index(request["name"])
                 client = self.clients[client_index]
-                print("Validating existing user's password, id: ".format(client["clientID"]))
+                print("Validating existing user's password, id: {}".format(client["clientID"]))
                 if password_hash != client["passwordHash"]:
                     raise ValueError("Client Already Registered, password incorrect.")
                 self.clients[client_index]["lastSeen"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -228,7 +228,7 @@ class KerberosAuthServer:
             "ticket": response.get('ticket')
         }
         # print(f"payload: \n{payload}")
-        print("sending {} a ticket at ->".format(client_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        print("sending {} a ticket at ->{}".format(client_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         return {
             "header": {
                 "code": 1603,
@@ -364,8 +364,9 @@ def load_clients():
                 })
             return clients
     except Exception as e:
-        print("load_clients error: \n" + str(e))
-        print("No clients found")
+        str(e)
+        # print("load_clients error: \n" + str(e))
+        # print("No clients found")
         return []
 
 
