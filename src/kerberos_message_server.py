@@ -1,12 +1,8 @@
 import json
 import struct
-# import sys
 import threading
 from shared_server import *
 import socket
-# import logging
-
-from base64 import b64decode
 
 SERVER_FILE = "msg.info"
 
@@ -34,34 +30,12 @@ def message_keys(key: int):
     return switcher.get(key, -1)
 
 
-# def read_server():
-#     try:
-#         with open(SERVER_FILE, 'r') as server_file:
-#             data = server_file.readlines()
-#             server_data = {"port": get_port()}
-#             for i in range(len(data)):
-#                 data_key = message_keys(i)
-#                 if i != -1:
-#                     server_data[data_key] = data[i]
-#                 else:
-#                     raise Exception("Corrupted message file")
-#             return server_data
-#     except Exception as e:
-#         print(str(e))
-#         print("Going back to default port: 1256")
-#         default_error()
-
-
 class KerberosMessageServer:
     """
-    represents a kerberos message server
+    This class represents a kerberos message server.
     """
 
-    # def __init__(self, port: int, name: str, uuid: str, key):
     def __init__(self):
-        """
-        constructor
-        """
         try:
             server = get_message_servers()
             self._port = int(server["port"])
@@ -76,13 +50,16 @@ class KerberosMessageServer:
             print("Init error: " + str(e))
             default_error()
 
+
     @property
     def ip(self):
         return self._ip
 
+
     @property
     def version(self):
         return self._version
+
 
     @property
     def port(self):
@@ -92,6 +69,7 @@ class KerberosMessageServer:
         """
         return self._port
 
+
     @property
     def name(self):
         """
@@ -99,6 +77,7 @@ class KerberosMessageServer:
         :return: the object's name
         """
         return self._name
+
 
     @property
     def uuid(self):
@@ -108,6 +87,7 @@ class KerberosMessageServer:
         """
         return self._uuid
 
+
     @property
     def key(self):
         """
@@ -116,6 +96,7 @@ class KerberosMessageServer:
         """
         return self._key
 
+
     @property
     def lock(self):
         """
@@ -123,6 +104,7 @@ class KerberosMessageServer:
         :return: the object's lock
         """
         return self._lock
+
 
     def get_and_decrypt_key(self, request):
         """
@@ -149,6 +131,7 @@ class KerberosMessageServer:
             print("get_and_decrypt_key error: " + str(e))
             return default_error()
 
+
     def print_message(self, client_id, request):
         """
         Prints a user message
@@ -171,6 +154,7 @@ class KerberosMessageServer:
         except Exception as e:
             print("print_message error: " + str(e))
             return default_error()
+
 
     def receive_client_request(self, client_socket, addr):
         try:
@@ -201,7 +185,7 @@ class KerberosMessageServer:
             print(f"Error when handling client: {e}")
         finally:
             client_socket.close()
-            # print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+
 
     def handle_client_request(self, request):
         """
@@ -212,7 +196,6 @@ class KerberosMessageServer:
         try:
             if not request:
                 raise NameError("request is empty!")
-            # print(f"Got Request: {request}")
             try:
                 payload = json.loads(request["payload"])
             except Exception as e:
@@ -235,6 +218,7 @@ class KerberosMessageServer:
             print("handle_client_request error: " + str(e))
             return {"code": default_error()}
 
+
     def start_server(self):
         """
         infinite loop, listening to requests from clients
@@ -242,7 +226,6 @@ class KerberosMessageServer:
         """
         # TODO: add methods to check this
         try:
-            # print(f"Message Server Started on port {self.port}")
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # bind the socket to the host and port
             server.bind((self.ip, self.port))
@@ -253,7 +236,6 @@ class KerberosMessageServer:
             while True:
                 # accept a client connection
                 client_socket, addr = server.accept()
-                # print(f"Accepted connection from {addr[0]}:{addr[1]}")
                 # start a new thread to handle the client
                 thread = threading.Thread(target=self.receive_client_request, args=(client_socket, addr,))
                 thread.start()
@@ -264,18 +246,9 @@ class KerberosMessageServer:
 
 
 def main():
-    """
-    creates an instance of messaging server
-    :return:
-    """
     server = KerberosMessageServer()
-    # logging.basicConfig(stream=sys.stdout, level=get_log_level())
     print("Kerberos Message Server")
-    # print(f"My name is {server.name}")
-    # print(f"Port: {server.port}")
-    # print(f"Version: {server.version}")
-    # print(f"my uuid is {server.uuid}")
-    # print(f"my key is {server.key}")
+    print(f"My name is {server.name}")
 
     server.start_server()
 

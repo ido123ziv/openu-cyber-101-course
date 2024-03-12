@@ -1,14 +1,13 @@
 import json
 import struct
-# import sys
 from datetime import datetime, timedelta
-# import logging
 
 import socket
 import threading
 from shared_server import *
 from uuid import uuid1
 import ast
+
 CLIENT_FILE = "clients.info"
 SERVERS_FILE = "servers.info"
 SERVER_IP = "127.0.0.1"
@@ -21,9 +20,8 @@ def create_uuid():
 
 class KerberosAuthServer:
     """
-    This class represents an auth server used by the kerberos protocol and handles all the commands
+    This class represents an auth server used by the kerberos protocol and handles all the commands.
     """
-
     def __init__(self):
         """
         creates an object
@@ -34,7 +32,7 @@ class KerberosAuthServer:
         self._version = get_version()
         self._message_server = get_message_servers()
         self._servers = {}
-        # self.lock = threading.Lock()
+
 
     @property
     def server_ip(self):
@@ -42,6 +40,7 @@ class KerberosAuthServer:
         :return: current server ip
         """
         return self._server_ip
+
 
     @property
     def clients(self):
@@ -51,11 +50,13 @@ class KerberosAuthServer:
         """
         return self._clients
 
+
     def __client_ids__(self):
         """
         :return: a list with all client ids
         """
         return [x["clientID"] for x in self.clients]
+
 
     @property
     def port(self):
@@ -65,6 +66,7 @@ class KerberosAuthServer:
         """
         return self._port
 
+
     @property
     def version(self):
         """
@@ -72,6 +74,7 @@ class KerberosAuthServer:
         :return: the server version
         """
         return self._version
+
 
     @property
     def servers(self):
@@ -81,6 +84,7 @@ class KerberosAuthServer:
         """
         return self._servers
 
+
     @property
     def message_server(self):
         """
@@ -89,12 +93,14 @@ class KerberosAuthServer:
         """
         return self._message_server
 
+
     def get_clients_names(self):
         """
         getting a list of names from current client list
         :return: a list of all client names
         """
         return [x["name"] for x in self.clients]
+
 
     def generate_session_key(self, client_id, server_id, nonce):
         """
@@ -113,7 +119,6 @@ class KerberosAuthServer:
 
         key = client.get("passwordHash")
         bytes_key = str(key).encode()[32:]
-        # print(f"bytes: {bytes_key}, len: {len(bytes_key)}")
 
         session_key = create_random_byte_key(16)
         client_key = encrypt_ng(bytes_key, {"encrypted_data": session_key, "nonce": nonce})
@@ -135,6 +140,7 @@ class KerberosAuthServer:
             "ticket": ticket
         }
 
+
     def generate_ticket(self, client_id, server_id, creation_time):
         """
         generate tgt from given key
@@ -149,6 +155,7 @@ class KerberosAuthServer:
             "server_id": server_id,
             "creation_timestamp": creation_time
         }
+
 
     def register(self, request):
         """
@@ -187,7 +194,6 @@ class KerberosAuthServer:
                     "payloadSize": len(str(client_id)),
                     "payload": client_id
                 }
-
         except Exception as e:
             print("register error: \n" + str(e))
             error_response = "Error! can't register user because of {}".format(str(e))
@@ -198,9 +204,10 @@ class KerberosAuthServer:
                 "payload": error_response
             }
 
+
     def handle_key_request(self, request):
         """
-        This function request a key for messaging server and generates a ticket, sending back to client
+        Requests a key for messaging server and generates a ticket, sending back to client
         :param request: client request
         :return: server response with key and ticket or Exception
         """
@@ -209,8 +216,6 @@ class KerberosAuthServer:
         nonce = ast.literal_eval(received_payload["nonce"])
         response = self.generate_session_key(client_id,
                                              self.message_server.get("uuid"), nonce)
-        # print("Created session key!")
-        # print(f"generate_session_key: {response}")
         encrypted_key = {
             "aes_key": response.get('aes_key'),
             "nonce": response.get('nonce'),
@@ -230,9 +235,10 @@ class KerberosAuthServer:
             "payload": payload
         }
 
+
     def receive_client_request(self, client_socket, addr):
         """
-        This method recieves the byte stream from socket, parses it and sends internally for handling
+        Recieves the byte stream from socket, parses it and sends internally for handling
         :param client_socket: socket listing to
         :param addr: address listening to
         :return: None
@@ -250,7 +256,6 @@ class KerberosAuthServer:
             if len(payload_data) != payload_size:
                 print("Payload size didn't match payload, Aborting!.")
                 raise ValueError
-
             request = {
                 "header": {
                     "clientID": client_id.decode("utf-8"),
@@ -261,13 +266,12 @@ class KerberosAuthServer:
                 "payload": payload_data.decode("utf-8")
             }
             response = self.handle_client_request(request)
-            # print(f"Server will now respond with: {response}")
             client_socket.send(json.dumps(response, default=str).encode("utf-8"))
         except Exception as e:
             print(f"Error when handling client: {e}")
         finally:
             client_socket.close()
-            # print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+
 
     def handle_client_request(self, request):
         """
@@ -276,14 +280,12 @@ class KerberosAuthServer:
         :return: error code
         """
         try:
-
             if not request:
                 raise NameError("request is empty!")
             if "error" in request["header"]["clientID"].lower():
                 raise ValueError("Invalid ClientId")
             if request["header"]["version"] != self.version:
                 raise ValueError("Server version don't match client version")
-            # print(f"handle_client_request: \n{request}")
             code = request["header"]["code"]
             try:
                 payload = json.loads(request["payload"])
@@ -303,13 +305,13 @@ class KerberosAuthServer:
             print("handle_client_request error: \n" + str(e))
             exit(1)
 
+
     def start_server(self):
         """
         infinite loop of listening server
         :return:
         """
         try:
-            # print(f"Server Started on port {self.port}")
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # bind the socket to the host and port
             server.bind((self.server_ip, self.port))
@@ -320,7 +322,6 @@ class KerberosAuthServer:
             while True:
                 # accept a client connection
                 client_socket, addr = server.accept()
-                # print(f"Accepted connection from {addr[0]}:{addr[1]}")
                 # start a new thread to handle the client
                 thread = threading.Thread(target=self.receive_client_request, args=(client_socket, addr,))
                 thread.start()
@@ -343,7 +344,7 @@ def load_clients():
                 raise LookupError
             clients = []
             for row in clients_list:
-                # parsing this:
+                # example - parsing this:
                 """
                 clientID: 219612343443330567787200566001537885281 Name: alice PasswordHash: 8a5eba0ab714cbcd4f314334f073c446c3092192de2e40271203a722f41648a5 LastSeen: 2024-01-28 22:34:33
                 """
@@ -384,23 +385,12 @@ def add_client_to_file(clients):
 
 
 def main():
-    """
-    main function
-    """
-    # logging.basicConfig(stream=sys.stdout, level=get_log_level())
     server = KerberosAuthServer()
     print("Kerberos Auth Server")
-    # logging.log("I'm a Kerberos Server!")
-
-    # logging.debug(f"my clients are: {server.clients}")
-    # logging.debug(f"using port: {server.port}")
-    # logging.debug(f"my version is {server.version}")
-    # logging.debug(f"message_sever in use: {server.message_server}")
-    # logging.debug(f"my messaging servers {server.servers}")
+    print(f"my clients are: {server.clients}")
+    print(f"my messaging servers {server.servers}")
     server.start_server()
 
 
 if __name__ == "__main__":
-    # print("Hello World")
     main()
-

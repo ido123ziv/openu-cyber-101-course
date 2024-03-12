@@ -1,9 +1,6 @@
-import sys
 from datetime import datetime
 import json
 import struct
-# import logging
-
 
 from shared_server import *
 import socket
@@ -109,7 +106,7 @@ class KerberosClient:
             return e
         finally:
             client.close()
-            # print("Connection to server closed")
+
 
     @property
     def client_id(self):
@@ -117,6 +114,7 @@ class KerberosClient:
         :return: client id in system
         """
         return self._client_id
+
 
     def __client_id__(self, uuid):
         """
@@ -133,6 +131,7 @@ class KerberosClient:
         :return: the client's version
         """
         return self._version
+    
 
     @property
     def aes_key(self):
@@ -142,6 +141,7 @@ class KerberosClient:
         """
         return self._aes_key
 
+
     @property
     def ticket(self):
         """
@@ -149,6 +149,7 @@ class KerberosClient:
         :return: the ticket for the message server
         """
         return self._ticket
+
 
     @property
     def sha256(self):
@@ -158,6 +159,7 @@ class KerberosClient:
         """
         return self._sha256
 
+
     def create_sha256(self, password):
         """
         :param password: client password
@@ -165,6 +167,7 @@ class KerberosClient:
         """
 
         self._sha256 = str(create_password_sha(password)).encode()[32:]
+
 
     def register(self):
         """
@@ -194,6 +197,7 @@ class KerberosClient:
             print(f"Successfully registered with uuid: {self.client_id}")
         except Exception as e:
             print(f"Caught Exception: {str(e)}")
+
 
     def validate_existing_user(self, client_id: str, username: str, password: str):
         """
@@ -231,6 +235,7 @@ class KerberosClient:
             print("Caught Value Error when validating password: " + str(e))
         except Exception as e:
             print(f"Unexpected registration error! " + str(e))
+
 
     def attempt_registration(self, username: str, password: str):
         """
@@ -276,14 +281,13 @@ class KerberosClient:
         except Exception as e:
             print(f"registration error! " + str(e))
 
+
     def receive_aes_key(self):
         """
         receives an aes key and a ticket to a message server.
         decrypts the key and saves it along with the ticket for future use.
         """
-        # print("Requesting AES KEY from Auth Server")
         try:
-            # nonce = create_nonce()
             nonce = str(create_nonce())
             payload = {
                 "serverID": SERVER_ID,
@@ -316,12 +320,12 @@ class KerberosClient:
         except Exception as e:
             print("Caught Error: " + str(e))
 
+
     def send_aes_key(self, server=SERVER_ID):
         """
         sends an authenticator and a ticket to the message server.
         :param server: messaging server id
         """
-        # print(f"Sending AES KEY to: {server}")
         try:
             authenticator = self.create_authenticator(server, self.client_id)
             ticket = self.ticket
@@ -341,6 +345,7 @@ class KerberosClient:
             self.send_message_to_server(request, server="msg")
         except Exception as e:
             print("send_aes_key: {}".format(str(e)))
+
 
     def send_message_for_print(self, message: str):
         """
@@ -363,16 +368,14 @@ class KerberosClient:
             "payload": json.dumps(payload)
         }
         try:
-            # print(f"Sending: {json.dumps(request)}")
-            response = self.send_message_to_server(request, server="msg")
-            # print(response)
+            self.send_message_to_server(request, server="msg")
 
         except Exception as e:
             print(f"Error: {str(e)}")
             print(ERROR_MESSAGE)
 
-    def create_authenticator(self, server_id, client_id):
 
+    def create_authenticator(self, server_id, client_id):
         """
         creates an authenticator using an AES key.
         :param client_id: client unique id.
@@ -389,7 +392,6 @@ class KerberosClient:
             "nonce": nonce
         }
         encrypted_data = encrypt_ng(self._aes_key, unencrypted_data)
-
         return {
             "authenticatorIV": encrypted_data["iv"],
             "version": encrypted_data["version"],
@@ -400,11 +402,6 @@ class KerberosClient:
 
 
 def main():
-    """
-    Main function for creation of a client
-    :return:
-    """
-    # logging.basicConfig(stream=sys.stdout, level=get_log_level())
     client = KerberosClient()
     # try:
     #     client.register()
