@@ -129,6 +129,25 @@ def encrypt_aes_ng(key, data):
     return str(iv+ct), iv
     # print(json.dumps(encrypted_struct))
 
+def encrypt_ng_ng(key, data, iv=None):
+    """
+    receives a key nonce and data and returns a tuple of iv, nonce and data encrypted
+    :param iv:
+    :param key: key used for encryption
+    :param data: dict of data to encrypt
+    :return: encrypted_data as dict
+    """
+    if iv is not None:
+        cipher = AES.new(key, AES.MODE_CBC,iv=iv)
+    else:
+        cipher = AES.new(key, AES.MODE_CBC)
+    ct_bytes = cipher.encrypt(pad(data, AES.block_size))
+    iv = b64encode(cipher.iv).decode('utf-8')
+    ct = b64encode(ct_bytes).decode('utf-8')
+    result = json.dumps({'iv': iv, 'ciphertext': ct})
+    print(result)
+    return ct
+
 
 def decrypt_ng(key, data, iv=None):
     """

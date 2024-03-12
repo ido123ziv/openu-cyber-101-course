@@ -299,6 +299,8 @@ class KerberosClient:
             }
             request["header"]["payloadSize"] = len(json.dumps(payload))
             response = self.send_message_to_server(request)
+            if response is None:
+                raise ValueError("Empty Response from Server")
             if isinstance(response, ValueError):
                 raise response
             response_data = json.loads(response)["payload"]
@@ -356,7 +358,7 @@ class KerberosClient:
         encrypts a given message and sends it to the message server.
         :param message: a message to encrypt.
         """
-        encrypted_message, message_iv = encrypt_aes_ng(self.aes_key, message.encode()) 
+        encrypted_message, message_iv = encrypt_aes_ng(self.aes_key, message.encode())
         # encrypt_ng(self._aes_key, dict(encrypted_data=message.encode()))
         payload = {
             "messageSize": len(encrypted_message),
