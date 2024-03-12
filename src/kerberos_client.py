@@ -12,7 +12,7 @@ CLIENT_FILE = f"{FOLDER_NAME}/me.info"
 SERVERS_FILE = f"{FOLDER_NAME}/srv.info"
 ERROR_MESSAGE = "Server responded with an error."
 # TODO use multiple message servers for now leave it
-SERVER_ID = "hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711hmd7dkd8r7dje711"
+SERVER_ID = "64f3f63985f04beb81a0e43321880182"
 
 
 def read_servers_info():
@@ -193,7 +193,7 @@ class KerberosClient:
         except Exception as e:
             print(f"Caught Exception: {str(e)}")
         else:
-            print(f"Successfully registered with uuid: {self.client_id}")
+            print(f"User with uuid: {self.client_id}")
 
     def validate_existing_user(self, client_id: str, username: str, password: str):
         """
@@ -230,6 +230,7 @@ class KerberosClient:
             print("Not valid server response")
         except ValueError as e:
             print("Caught Value Error when validating password: " + str(e))
+            self.register()
         except Exception as e:
             print(f"Unexpected registration error! " + str(e))
 
@@ -298,6 +299,10 @@ class KerberosClient:
             }
             request["header"]["payloadSize"] = len(json.dumps(payload))
             response = self.send_message_to_server(request)
+            if response is None:
+                raise ValueError("Empty Response from Server")
+            if isinstance(response, ValueError):
+                raise response
             response_data = json.loads(response)["payload"]
             encrypted_key = response_data["encrypted_key"]
             ticket = response_data["ticket"]
@@ -310,10 +315,12 @@ class KerberosClient:
             except ValueError as e:
                 print("Value Error: " + str(e))
                 print(ERROR_MESSAGE)
+                exit(1)
         except json.JSONDecodeError as e:
             print("Response from server is not valid \n" + ERROR_MESSAGE)
         except Exception as e:
             print("Caught Error: " + str(e))
+            exit(1)
 
     def send_aes_key(self, server=SERVER_ID):
         """
@@ -337,20 +344,26 @@ class KerberosClient:
                 },
                 "payload": json.dumps(payload)
             }
-            self.send_message_to_server(request, server="msg")
+            response = self.send_message_to_server(request, server="msg")
+            if isinstance(response,Exception):
+                raise response
+        except KeyError as e:
+            print("I fucked up: {}".format(str(e)))
         except Exception as e:
             print("send_aes_key: {}".format(str(e)))
+            exit(1)
 
     def send_message_for_print(self, message: str):
         """
         encrypts a given message and sends it to the message server.
         :param message: a message to encrypt.
         """
-        encrypted_message = encrypt_ng(self._aes_key, dict(encrypted_data=message.encode()))
+        encrypted_message, message_iv = encrypt_aes_ng(self.aes_key, message.encode())
+        # encrypt_ng(self._aes_key, dict(encrypted_data=message.encode()))
         payload = {
-            "messageSize": len(encrypted_message["encrypted_data"]),
-            "messageIV": encrypted_message["iv"],
-            "messageContent": encrypted_message["encrypted_data"]
+            "messageSize": len(encrypted_message),
+            "messageIV": message_iv,
+            "messageContent": encrypted_message
         }
         request = {
             "header": {
@@ -364,7 +377,7 @@ class KerberosClient:
         try:
             # print(f"Sending: {json.dumps(request)}")
             response = self.send_message_to_server(request, server="msg")
-            # print(response)
+            print("Server response: " + response)
 
         except Exception as e:
             print(f"Error: {str(e)}")
@@ -387,7 +400,12 @@ class KerberosClient:
             "timestamp": creation_time.encode(),
             "nonce": nonce
         }
-        encrypted_data = encrypt_ng(self._aes_key, unencrypted_data)
+        encrypted_data = {}
+        for k,v in unencrypted_data.items():
+            encrypted_data[k],client_iv=encrypt_aes_ng(self.aes_key,v)
+            if "client" in k:
+                encrypted_data["iv"] = client_iv
+        # encrypted_data = encrypt_ng(self._aes_key, unencrypted_data)
 
         return {
             "authenticatorIV": encrypted_data["iv"],
@@ -408,7 +426,7 @@ def main():
     client.register()
     client.receive_aes_key()
     client.send_aes_key()
-    client.send_message_for_print("Message!")
+    # client.send_message_for_print("Message!")
     try:
         while True:
             message = input("What to send to server? ")

@@ -2,9 +2,10 @@ import pytest
 import os
 
 from src.kerberos_client import KerberosClient
-from shared_server import *
+from src.shared_server import *
 
 CLIENT_FILE = "me.info"
+
 
 @pytest.fixture
 def client():
@@ -38,7 +39,7 @@ def test_register(client):
 
 
 def test_send_message(client):
-    client.send_message()
+    client.send_message_for_print("gaga")
 
 
 def test_send_key_to_server(client):
