@@ -67,6 +67,7 @@ class KerberosClient:
         self._auth_server = servers.get("auth")
         self._msg_server = servers.get("msg")
         self._version = get_version()
+        self._registration_count = 0
         self._client_id = None
         self._aes_key = None
         self._ticket = None
@@ -172,14 +173,17 @@ class KerberosClient:
         """
         sends a register request to the auth server.
         """
-        print("Register")
+        # print("Register")
         try:
+            if self._registration_count > 5:
+                raise ValueError("Max attempts exceeded!")
             client_info = get_client_info()
             if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
                 raise client_info  # Raises the caught exception to handle it in the except block
             username = client_info["username"]
             uuid = client_info["uuid"]
             self.__client_id__(uuid)
+            self._registration_count += 1
             if self.sha256 is None:
                 print(f"Welcome back user: {username}, uuid: {uuid}")
                 password = input("Please retype your password: ")
@@ -190,6 +194,9 @@ class KerberosClient:
             username = input("Enter username: ")
             password = input("Enter password: ")
             self.attempt_registration(username, password)
+        except ValueError as e:
+            print(str(e))
+            exit(1)
         except Exception as e:
             print(f"Caught Exception: {str(e)}")
         else:
@@ -203,7 +210,7 @@ class KerberosClient:
         :param password: new input password
         :return: saves new sha or execption
         """
-        print("existing user registering")
+        # print("existing user registering")
 
         payload = {
             "name": username,
