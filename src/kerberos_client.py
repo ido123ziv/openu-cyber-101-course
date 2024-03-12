@@ -8,7 +8,7 @@ import socket
 CLIENT_FILE = f"{FOLDER_NAME}/me.info"
 SERVERS_FILE = f"{FOLDER_NAME}/srv.info"
 ERROR_MESSAGE = "Server responded with an error."
-SERVER_ID = "hmd7dkd8r7dje711"
+SERVER_ID = "64f3f63985f04beb81a0e43321880182"
 
 
 def read_servers_info():

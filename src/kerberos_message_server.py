@@ -124,12 +124,9 @@ class KerberosMessageServer:
             # TODO compare client id if ticket to authenticator
             decrypted_authenticator={}
             for k,v in authenticator.items():
-                # print(k)
                 if "iv" not in k.lower():
                     decrypted_value = decrypt_ng(aes_key, v).decode("utf-8")
                     decrypted_authenticator[k] = decrypted_value
-                # else:
-                #     print(v)
             if not client_id == decrypted_authenticator["clientID"]:
                 raise ValueError("client id don't match")
                 
@@ -174,7 +171,7 @@ class KerberosMessageServer:
                 raise ValueError("Expired Ticket")
             client_key = self._clients[client_id]["key"]
             decrypted_message = decrypt_ng(client_key, message).decode("utf-8")
-            print("decrypted message: " + decrypted_message)
+            print("Decrypted message: " + decrypted_message)
             return dict(Code=1605)
         except Exception as e:
             print("print_message error: " + str(e))
