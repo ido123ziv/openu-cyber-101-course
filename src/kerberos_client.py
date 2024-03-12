@@ -62,6 +62,7 @@ class KerberosClient:
         self._auth_server = servers.get("auth")
         self._msg_server = servers.get("msg")
         self._version = get_version()
+        self._registration_count = 0
         self._client_id = None
         self._aes_key = None
         self._ticket = None
@@ -94,7 +95,6 @@ class KerberosClient:
             client.send(header_data + message["payload"].encode("utf-8"))
             response = client.recv(1024)
             response = response.decode("utf-8")
-            # print(f"Received: {response}")
             if not response or response is None:
                 raise ValueError("Server response is empty")
             return response
@@ -174,12 +174,15 @@ class KerberosClient:
         sends a register request to the auth server.
         """
         try:
+            if self._registration_count > 5:
+                raise ValueError("Max attempts exceeded!")
             client_info = get_client_info()
             if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
                 raise client_info  # Raises the caught exception to handle it in the except block
             username = client_info["username"]
             uuid = client_info["uuid"]
             self.__client_id__(uuid)
+            self._registration_count += 1
             if self.sha256 is None:
                 print(f"Welcome back user: {username}, uuid: {uuid}")
                 password = input("Please retype your password: ")
@@ -205,7 +208,6 @@ class KerberosClient:
         :param client_id: stored client id
         :param username: stored username
         :param password: new input password
-        :return: saves new sha or execption
         """
         payload = {
             "name": username,
@@ -233,6 +235,7 @@ class KerberosClient:
             print("Not valid server response")
         except ValueError as e:
             print("Caught Value Error when validating password: " + str(e))
+            self.register()
         except Exception as e:
             print(f"Unexpected registration error! " + str(e))
 
@@ -263,8 +266,6 @@ class KerberosClient:
             if isinstance(response, Exception):
                 raise response
             response_data = json.loads(response)
-            # print(response_data)
-            # print("ffffffff")
             if "error" in response_data["payload"].lower():
                 raise ValueError("Server error: " + response_data["payload"])
             if len(response_data["payload"]) < 16:
@@ -303,6 +304,10 @@ class KerberosClient:
             }
             request["header"]["payloadSize"] = len(json.dumps(payload))
             response = self.send_message_to_server(request)
+            if response is None:
+                raise ValueError("Empty Response from Server")
+            if isinstance(response, ValueError):
+                raise response
             response_data = json.loads(response)["payload"]
             encrypted_key = response_data["encrypted_key"]
             ticket = response_data["ticket"]
@@ -315,10 +320,12 @@ class KerberosClient:
             except ValueError as e:
                 print("Value Error: " + str(e))
                 print(ERROR_MESSAGE)
+                exit(1)
         except json.JSONDecodeError as e:
             print("Response from server is not valid \n" + ERROR_MESSAGE)
         except Exception as e:
             print("Caught Error: " + str(e))
+            exit(1)
 
 
     def send_aes_key(self, server=SERVER_ID):
@@ -342,9 +349,14 @@ class KerberosClient:
                 },
                 "payload": json.dumps(payload)
             }
-            self.send_message_to_server(request, server="msg")
+            response = self.send_message_to_server(request, server="msg")
+            if isinstance(response,Exception):
+                raise response
+        except KeyError as e:
+            print("I fucked up: {}".format(str(e)))
         except Exception as e:
             print("send_aes_key: {}".format(str(e)))
+            exit(1)
 
 
     def send_message_for_print(self, message: str):
@@ -352,11 +364,11 @@ class KerberosClient:
         encrypts a given message and sends it to the message server.
         :param message: a message to encrypt.
         """
-        encrypted_message = encrypt_ng(self._aes_key, dict(encrypted_data=message.encode()))
+        encrypted_message, message_iv = encrypt_aes_ng(self.aes_key, message.encode())
         payload = {
-            "messageSize": len(encrypted_message["encrypted_data"]),
-            "messageIV": encrypted_message["iv"],
-            "messageContent": encrypted_message["encrypted_data"]
+            "messageSize": len(encrypted_message),
+            "messageIV": message_iv,
+            "messageContent": encrypted_message
         }
         request = {
             "header": {
@@ -368,7 +380,8 @@ class KerberosClient:
             "payload": json.dumps(payload)
         }
         try:
-            self.send_message_to_server(request, server="msg")
+            response = self.send_message_to_server(request, server="msg")
+            print("Server response: " + response)
 
         except Exception as e:
             print(f"Error: {str(e)}")
@@ -391,7 +404,12 @@ class KerberosClient:
             "timestamp": creation_time.encode(),
             "nonce": nonce
         }
-        encrypted_data = encrypt_ng(self._aes_key, unencrypted_data)
+        encrypted_data = {}
+        for k,v in unencrypted_data.items():
+            encrypted_data[k],client_iv=encrypt_aes_ng(self.aes_key,v)
+            if "client" in k:
+                encrypted_data["iv"] = client_iv
+
         return {
             "authenticatorIV": encrypted_data["iv"],
             "version": encrypted_data["version"],
@@ -418,7 +436,7 @@ def main():
             message = input("What to send to server? ")
             client.send_message_for_print(message)
     except KeyboardInterrupt:
-        print("\nThanks for playing")
+        print("\nThanks for playing!")
 
 
 # Todo: support for multiple clients

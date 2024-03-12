@@ -69,7 +69,7 @@ def test_unregistered_user(server):
     }
     client_request = {
         "header": {
-            "clientID": "0320632458510680",
+            "clientID": "000000000000000",
             "version": 24,
             "code": 1024,
             "payloadSize": len(json.dumps(payload))
@@ -77,7 +77,7 @@ def test_unregistered_user(server):
         "payload": json.dumps(payload)
     }
     client_request["header"]["payloadSize"] = len(json.dumps(client_request["payload"]))
-    send_to_server(server, client_request, 1600)
+    send_to_server(server, client_request, 1601)
 
 
 # TODO: fix why not raising errors
@@ -99,7 +99,7 @@ def test_incorrect_password(server):
             "payload": json.dumps(payload)
         }
         client_request["header"]["payloadSize"] = len(json.dumps(client_request["payload"]))
-        send_to_server(server, client_request, 1600)
+        send_to_server(server, client_request, 1601)
     except Exception as e:
         print("Not enough users: " + str(e))
         with pytest.raises(ValueError, match="didn't find users"):

@@ -121,22 +121,25 @@ class KerberosAuthServer:
         bytes_key = str(key).encode()[32:]
 
         session_key = create_random_byte_key(16)
-        client_key = encrypt_ng(bytes_key, {"encrypted_data": session_key, "nonce": nonce})
+        # client_key = encrypt_ng(bytes_key, {"encrypted_data": session_key, "nonce": nonce})
+        client_nonce, nonce_iv = encrypt_aes_ng(bytes_key, nonce)
+        client_key, client_iv = encrypt_aes_ng(bytes_key, session_key)
 
         creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
 
-        ticket_key = encrypt_ng(self.message_server.get("key"), {"encrypted_data": session_key, "time": expiration_time.encode()})
+        ticket_key,ticket_key_iv = encrypt_aes_ng(self.message_server.get("key"), session_key)
+        ticket_time,ticket_time_iv = encrypt_aes_ng(self.message_server.get("key"), expiration_time.encode())
 
         ticket = self.generate_ticket(client_id, server_id,  creation_time)
-        ticket["ticket_iv"] = ticket_key["iv"]
-        ticket["aes_key"] = ticket_key["encrypted_data"]
-        ticket["expiration_time"] = ticket_key["time"]
+        ticket["ticket_iv"] = ticket_key_iv
+        ticket["aes_key"] = ticket_key
+        ticket["expiration_time"] = ticket_time
 
         return {
-            "encrypted_key_iv": client_key["iv"],
-            "nonce": client_key["nonce"],
-            "aes_key": client_key["encrypted_data"],
+            "encrypted_key_iv": client_iv,
+            "nonce": client_nonce,
+            "aes_key": client_key,
             "ticket": ticket
         }
 
@@ -169,6 +172,8 @@ class KerberosAuthServer:
                 client = self.clients[client_index]
                 if password_hash != client["passwordHash"]:
                     raise ValueError("Client Already Registered, password incorrect.")
+                self.clients[client_index]["lastSeen"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                add_client_to_file(self.clients)
                 return {
                     "code": 1600,
                     "version": self.version,
@@ -294,7 +299,7 @@ class KerberosAuthServer:
             if code == 1024:
                 return self.register(payload)
             if code == 1027:
-                print("Client requested key")
+                # print("Client requested key")
                 return self.handle_key_request(request)
 
             return "Not supported yet!"

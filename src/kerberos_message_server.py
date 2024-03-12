@@ -1,8 +1,10 @@
 import json
 import struct
+from datetime import datetime
 import threading
-from shared_server import *
 import socket
+
+from shared_server import *
 
 SERVER_FILE = "msg.info"
 
@@ -116,14 +118,40 @@ class KerberosMessageServer:
             ticket = request.get("ticket")
             authenticator = request.get("authenticator")
             aes_key = decrypt_ng(self.key, ticket["aes_key"], ticket["ticket_iv"])
+            ticket_expiration_time = decrypt_ng(self.key, ticket["expiration_time"]).decode("utf-8")
+            # print(ticket_expiration_time)
+            ticket_expiration_timef = datetime.strptime(ticket_expiration_time,'%Y-%m-%d %H:%M:%S')
             client_id = ticket.get("client_id")
+            # print(json.dumps(authenticator))
             # TODO compare client id if ticket to authenticator
-            recieved_client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
+            decrypted_authenticator={}
+            for k,v in authenticator.items():
+                # print(k)
+                if "iv" not in k.lower():
+                    decrypted_value = decrypt_ng(aes_key, v).decode("utf-8")
+                    # print(f"{k}->{decrypted_value}")
+                    decrypted_authenticator[k] = decrypted_value
+                # else:
+                #     print(v)
+            if not client_id == decrypted_authenticator["clientID"]:
+                raise ValueError("client id don't match")
+                
+            if datetime.strptime(decrypted_authenticator["creationTime"],'%Y-%m-%d %H:%M:%S') > ticket_expiration_timef:
+                raise ValueError("expired ticket")
+            
+            if not decrypted_authenticator["version"] == str(self.version):
+                raise ValueError("incompatible version")
+
+            if not decrypted_authenticator["serverID"] == self.uuid:
+                raise ValueError("Wrong Message Server")
+
+            # recieved_client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
 
             # print(f"ticket client id: {client_id}\nauthenticator client id: {recieved_client_id}")
 
             self._clients[client_id] = {
-                "key": aes_key
+                "key": aes_key,
+                "expire_timestamp": ticket_expiration_time
             }
             print("Symmetric key accepted")
             return dict(Code=1604)
@@ -146,10 +174,12 @@ class KerberosMessageServer:
             message = request["messageContent"]
             if client_id not in self._clients.keys():
                 raise ValueError("Unregistered User")
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if now > self._clients[client_id]["expire_timestamp"]:
+                raise ValueError("Expired Ticket")
             client_key = self._clients[client_id]["key"]
-
-            decrypted_message = decrypt_ng(client_key, message, request["messageIV"]).decode("utf-8")
-            print("Received message: " + decrypted_message)
+            decrypted_message = decrypt_ng(client_key, message).decode("utf-8")
+            print("decrypted message: " + decrypted_message)
             return dict(Code=1605)
         except Exception as e:
             print("print_message error: " + str(e))
@@ -249,6 +279,7 @@ def main():
     server = KerberosMessageServer()
     print("Kerberos Message Server")
     print(f"My name is {server.name}")
+    print(f"My uuid is {server.uuid}")
 
     server.start_server()
 
