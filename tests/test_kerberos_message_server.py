@@ -1,7 +1,7 @@
-import pytest
-
 from src.kerberos_message_server import KerberosMessageServer
 from src.shared_server import *
+
+import pytest
 import os
 os.chdir("../src")
 
@@ -26,10 +26,5 @@ def test_port(server, messages):
 
 def test_uuid(server, messages):
     assert messages.get("uuid") == server.uuid
-
-
-# def test_main(server):
-#     server.start_server()
-
 
 # Todo: Add checks if ports match as test

@@ -1,8 +1,8 @@
-import pytest
-import os
-
 from src.kerberos_client import KerberosClient
 from src.shared_server import *
+
+import pytest
+import os
 
 CLIENT_FILE = "me.info"
 
