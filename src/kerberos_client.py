@@ -173,14 +173,17 @@ class KerberosClient:
         """
         sends a register request to the auth server.
         """
-        # print("Register")
+        print("Hello, Welcome To Kerberos!")
+        username = input("Please state your username: ")
         try:
             if self._registration_count > 5:
                 raise ValueError("Max attempts exceeded!")
             client_info = get_client_info()
             if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
                 raise client_info  # Raises the caught exception to handle it in the except block
-            username = client_info["username"]
+            if not client_info["username"] == username:
+                os.remove(CLIENT_FILE)
+                raise FileNotFoundError("new user request")
             uuid = client_info["uuid"]
             self.__client_id__(uuid)
             self._registration_count += 1
@@ -191,7 +194,7 @@ class KerberosClient:
         except (FileNotFoundError, IndexError) as e:
             print(f"Unable to find client information or invalid format in '{CLIENT_FILE}': {e}")
             # Prompting for user input if there is an issue with the client file
-            username = input("Enter username: ")
+
             password = input("Enter password: ")
             self.attempt_registration(username, password)
         except ValueError as e:
