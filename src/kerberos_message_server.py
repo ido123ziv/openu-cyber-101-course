@@ -39,7 +39,7 @@ class KerberosMessageServer:
 
     def __init__(self):
         try:
-            server = get_message_servers()
+            server = get_message_server()
             self._port = int(server["port"])
             self._ip = server["ip"]
             self._name = server["name"]
@@ -119,17 +119,14 @@ class KerberosMessageServer:
             authenticator = request.get("authenticator")
             aes_key = decrypt_ng(self.key, ticket["aes_key"], ticket["ticket_iv"])
             ticket_expiration_time = decrypt_ng(self.key, ticket["expiration_time"]).decode("utf-8")
-            # print(ticket_expiration_time)
             ticket_expiration_timef = datetime.strptime(ticket_expiration_time,'%Y-%m-%d %H:%M:%S')
             client_id = ticket.get("client_id")
-            # print(json.dumps(authenticator))
             # TODO compare client id if ticket to authenticator
             decrypted_authenticator={}
             for k,v in authenticator.items():
                 # print(k)
                 if "iv" not in k.lower():
                     decrypted_value = decrypt_ng(aes_key, v).decode("utf-8")
-                    # print(f"{k}->{decrypted_value}")
                     decrypted_authenticator[k] = decrypted_value
                 # else:
                 #     print(v)
@@ -146,8 +143,6 @@ class KerberosMessageServer:
                 raise ValueError("Wrong Message Server")
 
             # recieved_client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
-
-            # print(f"ticket client id: {client_id}\nauthenticator client id: {recieved_client_id}")
 
             self._clients[client_id] = {
                 "key": aes_key,

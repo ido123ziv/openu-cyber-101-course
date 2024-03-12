@@ -9,12 +9,14 @@ from uuid import uuid1
 import ast
 
 CLIENT_FILE = "clients.info"
-SERVERS_FILE = "servers.info"
 SERVER_IP = "127.0.0.1"
 
 
 def create_uuid():
-    """creates uuid for each request, represent a client"""
+    """
+    creates uuid for each request, represent a client.
+    :return: the created uuid.
+    """
     return uuid1().int
 
 
@@ -30,8 +32,7 @@ class KerberosAuthServer:
         self._port = get_port()
         self._server_ip = SERVER_IP
         self._version = get_version()
-        self._message_server = get_message_servers()
-        self._servers = {}
+        self._message_server = get_message_server()
 
 
     @property
@@ -77,15 +78,6 @@ class KerberosAuthServer:
 
 
     @property
-    def servers(self):
-        """
-        getter for servers property 
-        :return: a list of message servers
-        """
-        return self._servers
-
-
-    @property
     def message_server(self):
         """
         getter for message_sever property 
@@ -120,8 +112,8 @@ class KerberosAuthServer:
         key = client.get("passwordHash")
         bytes_key = str(key).encode()[32:]
 
-        session_key = create_random_byte_key(16)
-        # client_key = encrypt_ng(bytes_key, {"encrypted_data": session_key, "nonce": nonce})
+        session_key = create_random_byte_key()
+        # TODO: if 'nonce_iv' not used, delete it
         client_nonce, nonce_iv = encrypt_aes_ng(bytes_key, nonce)
         client_key, client_iv = encrypt_aes_ng(bytes_key, session_key)
 
@@ -392,8 +384,6 @@ def add_client_to_file(clients):
 def main():
     server = KerberosAuthServer()
     print("Kerberos Auth Server")
-    print(f"my clients are: {server.clients}")
-    print(f"my messaging servers {server.servers}")
     server.start_server()
 
 
