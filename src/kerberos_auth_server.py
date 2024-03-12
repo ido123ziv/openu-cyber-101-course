@@ -165,6 +165,8 @@ class KerberosAuthServer:
                 client = self.clients[client_index]
                 if password_hash != client["passwordHash"]:
                     raise ValueError("Client Already Registered, password incorrect.")
+                self.clients[client_index]["lastSeen"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                add_client_to_file(self.clients)
                 return {
                     "code": 1600,
                     "version": self.version,
@@ -294,7 +296,7 @@ class KerberosAuthServer:
             if code == 1024:
                 return self.register(payload)
             if code == 1027:
-                print("Client requested key")
+                # print("Client requested key")
                 return self.handle_key_request(request)
 
             return "Not supported yet!"
