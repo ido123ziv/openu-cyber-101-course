@@ -291,7 +291,6 @@ class KerberosAuthServer:
             if code == 1024:
                 return self.register(payload)
             if code == 1027:
-                # print("Client requested key")
                 return self.handle_key_request(request)
 
             return "Not supported yet!"

@@ -139,14 +139,12 @@ class KerberosMessageServer:
             if not decrypted_authenticator["serverID"] == self.uuid:
                 raise ValueError("Wrong Message Server")
 
-            # recieved_client_id = decrypt_ng(aes_key, authenticator["clientID"], authenticator["authenticatorIV"])
-
             self._clients[client_id] = {
                 "key": aes_key,
                 "expire_timestamp": ticket_expiration_time
             }
-            print("Symmetric key accepted")
-            return dict(Code=1604)
+            print(SERVER_RESPONSES["1604"])
+            return 1604
         except Exception as e:
             print("get_and_decrypt_key error: " + str(e))
             return default_error()
@@ -171,8 +169,8 @@ class KerberosMessageServer:
                 raise ValueError("Expired Ticket")
             client_key = self._clients[client_id]["key"]
             decrypted_message = decrypt_ng(client_key, message).decode("utf-8")
-            print("Decrypted message: " + decrypted_message)
-            return dict(Code=1605)
+            print("Received message: " + decrypted_message)
+            return 1605
         except Exception as e:
             print("print_message error: " + str(e))
             return default_error()

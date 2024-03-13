@@ -9,6 +9,7 @@ CLIENT_FILE = f"{FOLDER_NAME}/me.info"
 SERVERS_FILE = f"{FOLDER_NAME}/srv.info"
 ERROR_MESSAGE = "Server responded with an error."
 SERVER_ID = "64f3f63985f04beb81a0e43321880182"
+MAX_ATTEMPTS = 5
 
 
 def read_servers_info():
@@ -174,7 +175,7 @@ class KerberosClient:
         sends a register request to the auth server.
         """
         try:
-            if self._registration_count > 5:
+            if self._registration_count > MAX_ATTEMPTS:
                 raise ValueError("Max attempts exceeded!")
             client_info = get_client_info()
             if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
@@ -247,7 +248,6 @@ class KerberosClient:
         :param password:
         :return:
         """
-        print("new user registration")
         payload = {
             "name": username,
             "password": password
@@ -274,7 +274,6 @@ class KerberosClient:
             self.__client_id__(response_data["payload"])
             with open(CLIENT_FILE, 'w') as client_file:
                 client_file.writelines([username + "\n", self.client_id])
-            print("Registration attempt succeeded.")
         except json.JSONDecodeError:
             print("Not valid server response")
         except ValueError as e:
@@ -381,7 +380,7 @@ class KerberosClient:
         }
         try:
             response = self.send_message_to_server(request, server="msg")
-            print("Server response: " + response)
+            print("Server response: " + SERVER_RESPONSES[response])
 
         except Exception as e:
             print(f"Error: {str(e)}")
@@ -421,14 +420,16 @@ class KerberosClient:
 
 def main():
     client = KerberosClient()
-    # try:
-    #     client.register()
-    # except Exception:
-    #     exit(1)
+
     response = client.register()
+    attempts = 1
     while isinstance(response, Exception):
         print(response)
         response = client.register()
+        attempts += 1
+    if attempts > MAX_ATTEMPTS:
+        exit(1)
+
     client.receive_aes_key()
     client.send_aes_key()
     try:
@@ -436,6 +437,7 @@ def main():
             message = input("What to send to server? ")
             client.send_message_for_print(message)
     except KeyboardInterrupt:
+        
         print("\nThanks for playing!")
 
 

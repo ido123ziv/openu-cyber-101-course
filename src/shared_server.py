@@ -12,6 +12,14 @@ FOLDER_NAME=os.path.dirname(os.path.abspath(__file__))
 PORT_FILE = f"{FOLDER_NAME}/port.info"
 MESSAGE_SERVER_FILE = f"{FOLDER_NAME}/msg.info"
 PROTOCOL_VERSION = 24
+SERVER_RESPONSES = {
+    "1600": "Succeeded registration",
+    "1601": "Failed registration",
+    "1603": "Symmetric key sent",
+    "1604": "Symmetric key accepted",
+    "1605": "Message received",
+    "1609": "General error"
+}
 
 
 # get_message_server_details. defaults to read but can write to it
