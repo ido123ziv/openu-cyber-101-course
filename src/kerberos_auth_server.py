@@ -158,11 +158,13 @@ class KerberosAuthServer:
         These methods handle the registration of a client to the server
         :return: if the register succeeded
         """
+        print("Registering a client")
         try:
             if request["name"] in self.get_clients_names():
                 password_hash = create_password_sha(request["password"])
                 client_index = self.get_clients_names().index(request["name"])
                 client = self.clients[client_index]
+                print("Validating existing user's password, id: {}".format(client["clientID"]))
                 if password_hash != client["passwordHash"]:
                     raise ValueError("Client Already Registered, password incorrect.")
                 self.clients[client_index]["lastSeen"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -176,6 +178,7 @@ class KerberosAuthServer:
             else:
                 client_id = str(create_uuid())[:16]
                 password_hash = create_password_sha(request["password"])
+                print("Registered new user, id: {}".format(client_id))
                 self.clients.append(
                     {
                         "clientID": client_id,
@@ -225,6 +228,7 @@ class KerberosAuthServer:
             "ticket": response.get('ticket')
         }
         # print(f"payload: \n{payload}")
+        print("sending {} a ticket at ->{}".format(client_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         return {
             "header": {
                 "code": 1603,
@@ -296,7 +300,7 @@ class KerberosAuthServer:
             if code == 1024:
                 return self.register(payload)
             if code == 1027:
-                # print("Client requested key")
+                print(f"Client {request['header']['clientID']} requested key")
                 return self.handle_key_request(request)
 
             return "Not supported yet!"
@@ -360,8 +364,9 @@ def load_clients():
                 })
             return clients
     except Exception as e:
-        print("load_clients error: \n" + str(e))
-        print("No clients found")
+        str(e)
+        # print("load_clients error: \n" + str(e))
+        # print("No clients found")
         return []
 
 

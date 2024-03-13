@@ -171,6 +171,7 @@ class KerberosMessageServer:
                 "key": aes_key,
                 "expire_timestamp": ticket_expiration_time
             }
+            print("Received key for user: {}".format(client_id))
             return dict(Code=1604)
         except Exception as e:
             print("get_and_decrypt_key error: " + str(e))
