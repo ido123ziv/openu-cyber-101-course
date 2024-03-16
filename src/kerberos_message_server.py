@@ -6,7 +6,7 @@ import socket
 
 from shared_server import *
 
-SERVER_FILE = "msg.info"
+SERVER_FILE = f"{FOLDER_NAME}/msg.info"
 
 
 def default_error():

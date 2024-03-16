@@ -172,10 +172,10 @@ class KerberosClient:
 
     def register(self):
         """
-        sends a register request to the auth server.
+        sends a registeration request to the auth server.
         """
         try:
-            if self._registration_count > MAX_ATTEMPTS:
+            if self._registration_count == MAX_ATTEMPTS:
                 raise ValueError("Max attempts exceeded!")
             client_info = get_client_info()
             if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info

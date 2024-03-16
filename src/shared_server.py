@@ -78,37 +78,6 @@ def create_password_sha(password: str):
     return sh.hexdigest()
 
 
-# TODO: check if needed
-def encrypt_aes(aes_key, nonce, data):
-        """
-        encrypts a given data using aes key and nonce.
-        :param aes_key: AES Symmetric Key in used.
-        :param nonce: random value created by the client.
-        :param data: data to encrypt.
-        :return: encrypted data as bytes object.
-        """
-        ciphertext = aes_key.encrypt(pad(data, AES.block_size))
-        return b64encode(nonce + ciphertext)
-
-
-# TODO: check if needed
-def encrypt_ng(key, data):
-    """
-    receives a key nonce and data and returns a tuple of iv, nonce and data encrypted.
-    :param key: key used for encryption.
-    :param data: dict of data to encrypt.
-    :return: encrypted_data as dict.
-    """
-    cipher = AES.new(key, AES.MODE_CBC)
-    iv = b64encode(cipher.iv).decode('utf-8')
-    encrypted_struct = dict(iv=iv)
-    for key, value in data.items():
-        ct_bytes = cipher.encrypt(pad(value, AES.block_size))
-        ct = b64encode(ct_bytes).decode('utf-8')
-        encrypted_struct[key] = ct
-    return encrypted_struct
-
-
 def encrypt_aes_ng(key, data):
     """
     receives a key nonce and data and returns a tuple of iv, nonce and data encrypted.
@@ -122,27 +91,6 @@ def encrypt_aes_ng(key, data):
     ct_bytes = cipher.encrypt(pad(data, AES.block_size))
     ct = b64encode(ct_bytes).decode('utf-8')
     return str(iv+ct), iv
-
-
-# TODO: check if needed
-def encrypt_ng_ng(key, data, iv=None):
-    """
-    receives a key nonce and data and returns a tuple of iv, nonce and data encrypted.
-    :param key: key used for encryption.
-    :param data: dict of data to encrypt.
-    :param iv: iv that 
-    :return: encrypted_data as dict.
-    """
-    if iv is not None:
-        cipher = AES.new(key, AES.MODE_CBC,iv=iv)
-    else:
-        cipher = AES.new(key, AES.MODE_CBC)
-    ct_bytes = cipher.encrypt(pad(data, AES.block_size))
-    iv = b64encode(cipher.iv).decode('utf-8')
-    ct = b64encode(ct_bytes).decode('utf-8')
-    result = json.dumps({'iv': iv, 'ciphertext': ct})
-    print(result)
-    return ct
 
 
 def decrypt_ng(key, data, iv=None):
@@ -164,21 +112,6 @@ def decrypt_ng(key, data, iv=None):
     except (ValueError, KeyError) as e:
         print("Got Error, Incorrect decryption")
         return e
-
-
-# TODO: check if needed
-def decrypt_aes(encrypted_data, key):
-    """
-    decrypts a given encrypted data using aes key.
-    :param encrypted_data: data to decript. 
-    :param key: AES Symmetric Key in used.
-    :return: decrypted data as byte string.
-    """
-    data = b64decode(encrypted_data)
-    iv, ciphertext = data[:16], data[16:]
-    cipher = AES.new(key,  AES.MODE_CBC, iv)
-    decrypted_data = unpad(cipher.decrypt(ciphertext), AES.block_size)
-    return decrypted_data
 
 
 def create_random_byte_key():

@@ -8,7 +8,7 @@ from shared_server import *
 from uuid import uuid1
 import ast
 
-CLIENT_FILE = "clients.info"
+CLIENT_FILE = f"{FOLDER_NAME}/clients.info"
 SERVER_IP = "127.0.0.1"
 
 
@@ -106,22 +106,21 @@ class KerberosAuthServer:
             client_index = clients_ids.index(client_id)
             client = self.clients[client_index]
         except Exception as e:
-            print("Client is not registered! " + str(e))
+            print("Client is not registered! \n" + str(e))
             raise ValueError("Client Not Registered")
 
         key = client.get("passwordHash")
         bytes_key = str(key).encode()[32:]
 
         session_key = create_random_byte_key()
-        # TODO: if 'nonce_iv' not used, delete it
-        client_nonce, nonce_iv = encrypt_aes_ng(bytes_key, nonce)
+        client_nonce, _ = encrypt_aes_ng(bytes_key, nonce)
         client_key, client_iv = encrypt_aes_ng(bytes_key, session_key)
 
         creation_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         expiration_time = (datetime.now() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
 
-        ticket_key,ticket_key_iv = encrypt_aes_ng(self.message_server.get("key"), session_key)
-        ticket_time,ticket_time_iv = encrypt_aes_ng(self.message_server.get("key"), expiration_time.encode())
+        ticket_key, ticket_key_iv = encrypt_aes_ng(self.message_server.get("key"), session_key)
+        ticket_time, _ = encrypt_aes_ng(self.message_server.get("key"), expiration_time.encode())
 
         ticket = self.generate_ticket(client_id, server_id,  creation_time)
         ticket["ticket_iv"] = ticket_key_iv
@@ -154,7 +153,7 @@ class KerberosAuthServer:
 
     def register(self, request):
         """
-        These methods handle the registration of a client to the server
+        handles the registration of a client to the server
         :return: if the register succeeded
         """
         try:
@@ -308,6 +307,7 @@ class KerberosAuthServer:
         :return:
         """
         try:
+            print(f"Server Started on port {self.port}")
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # bind the socket to the host and port
             server.bind((self.server_ip, self.port))
@@ -330,7 +330,7 @@ class KerberosAuthServer:
 def load_clients():
     # TODO: make it better than addressing the locations hard coded
     """
-    Loads client from file
+    Loads clients from file
     :return: a list of give clients
     """
     try:
@@ -351,6 +351,7 @@ def load_clients():
                     "passwordHash": client[5],
                     "lastSeen": client[7] + " " + client[8].strip()
                 })
+            print(clients)
             return clients
     except Exception as e:
         print("load_clients error: \n" + str(e))
@@ -364,6 +365,7 @@ def add_client_to_file(clients):
     :param clients: current client list
     """
     backup_client = load_clients()
+    # print(backup_client)
     try:
         with open(CLIENT_FILE, 'w+') as clients_file:
             for client in clients:
