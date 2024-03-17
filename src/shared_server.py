@@ -11,6 +11,7 @@ from base64 import b64encode, b64decode
 FOLDER_NAME=os.path.dirname(os.path.abspath(__file__))
 PORT_FILE = f"{FOLDER_NAME}/port.info"
 MESSAGE_SERVER_FILE = f"{FOLDER_NAME}/msg.info"
+CLIENT_FILE = f"{FOLDER_NAME}/clients.info"
 PROTOCOL_VERSION = 24
 SERVER_RESPONSES = {
     "1600": "Succeeded registration",
@@ -52,6 +53,38 @@ def get_version():
     :return: the protocol version.
     """
     return PROTOCOL_VERSION
+
+
+def load_clients():
+    # TODO: make it better than addressing the locations hard coded
+    """
+    Loads clients from file
+    :return: a list of give clients
+    """
+    try:
+        with open(CLIENT_FILE, 'r') as clients_file:
+            clients_list = clients_file.readlines()
+            if clients_list is None or not clients_list:
+                raise LookupError
+            clients = []
+            for row in clients_list:
+                # example - parsing this:
+                """
+                clientID: 219612343443330567787200566001537885281 Name: alice PasswordHash: 8a5eba0ab714cbcd4f314334f073c446c3092192de2e40271203a722f41648a5 LastSeen: 2024-01-28 22:34:33
+                """
+                client = row.split(" ")
+                clients.append({
+                    "clientID": client[1],
+                    "name": client[3],
+                    "passwordHash": client[5],
+                    "lastSeen": client[7] + " " + client[8].strip()
+                })
+            # print(clients)
+            return clients
+    except Exception as e:
+        # print("load_clients error: \n" + str(e))
+        # print("No clients found")
+        return []
 
 
 def default_msg_server():

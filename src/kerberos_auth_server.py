@@ -91,7 +91,7 @@ class KerberosAuthServer:
         getting a list of names from current client list
         :return: a list of all client names
         """
-        return [x["name"] for x in self.clients]
+        return [client["name"] for client in self.clients]
 
 
     def generate_session_key(self, client_id, server_id, nonce):
@@ -327,45 +327,12 @@ class KerberosAuthServer:
             server.close()
 
 
-def load_clients():
-    # TODO: make it better than addressing the locations hard coded
-    """
-    Loads clients from file
-    :return: a list of give clients
-    """
-    try:
-        with open(CLIENT_FILE, 'r') as clients_file:
-            clients_list = clients_file.readlines()
-            if clients_list is None or not clients_list:
-                raise LookupError
-            clients = []
-            for row in clients_list:
-                # example - parsing this:
-                """
-                clientID: 219612343443330567787200566001537885281 Name: alice PasswordHash: 8a5eba0ab714cbcd4f314334f073c446c3092192de2e40271203a722f41648a5 LastSeen: 2024-01-28 22:34:33
-                """
-                client = row.split(" ")
-                clients.append({
-                    "clientID": client[1],
-                    "name": client[3],
-                    "passwordHash": client[5],
-                    "lastSeen": client[7] + " " + client[8].strip()
-                })
-            print(clients)
-            return clients
-    except Exception as e:
-        print("load_clients error: \n" + str(e))
-        print("No clients found")
-        return []
-
-
 def add_client_to_file(clients):
     """
     writes client list to file
     :param clients: current client list
     """
     backup_client = load_clients()
-    # print(backup_client)
     try:
         with open(CLIENT_FILE, 'w+') as clients_file:
             for client in clients:

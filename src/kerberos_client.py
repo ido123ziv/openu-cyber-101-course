@@ -53,6 +53,17 @@ def get_client_info():
         return e
 
 
+def get_uid_by_name(name):
+    """
+    :return: client's uuid by name.
+    """
+    try:
+        clients = load_clients()
+    except LookupError:
+        return []
+    return [client["clientID"] for client in clients if client["name"] == name]
+
+
 class KerberosClient:
     """
     This class represents a client used by the kerberos protocol.
@@ -63,7 +74,7 @@ class KerberosClient:
         self._auth_server = servers.get("auth")
         self._msg_server = servers.get("msg")
         self._version = get_version()
-        self._registration_count = 0
+        self._login_count = 0
         self._client_id = None
         self._aes_key = None
         self._ticket = None
@@ -170,37 +181,42 @@ class KerberosClient:
         self._sha256 = str(create_password_sha(password)).encode()[32:]
 
 
-    def register(self):
+    def register(self, username: str):
         """
         sends a registeration request to the auth server.
+        :return: exception if raised.
+        """
+        if len(username) > 255:
+            raise ValueError("Too long username.\nUnsuccessful registration.")
+        password = input("Enter password: ")
+        if len(password) > 255:
+            raise ValueError("Too long password.\nUnsuccessful registration.")
+        self.attempt_registration(username, password)
+        print(f"Successfully registered with uuid: {self.client_id}")
+
+
+    def login(self, username: str):
+        """
+        login existing user.
+        :return: ValueError if raised.
         """
         try:
-            if self._registration_count == MAX_ATTEMPTS:
+            if self._login_count == MAX_ATTEMPTS:
                 raise ValueError("Max attempts exceeded!")
-            client_info = get_client_info()
-            if isinstance(client_info, Exception):  # Checks if an error occurred while getting client info
-                raise client_info  # Raises the caught exception to handle it in the except block
-            username = client_info["username"]
-            uuid = client_info["uuid"]
+            self._login_count += 1
+            uuid = get_uid_by_name(username)[0]
             self.__client_id__(uuid)
-            self._registration_count += 1
-            if self.sha256 is None:
+            if self._login_count > 1:
+                print(f"{MAX_ATTEMPTS - self._login_count + 1} attempts left")
+            else:
                 print(f"Welcome back user: {username}, uuid: {uuid}")
-                password = input("Please retype your password: ")
-                return self.validate_existing_user(uuid, username, password)
-
-        except (FileNotFoundError, IndexError):
-            # Prompting for user input if there is an issue with the client file
-            username = input("Enter username: ")
-            if len(username) > 255:
-                return ValueError("Too long username.\nUnsuccessful registration.")
-            password = input("Enter password: ")
-            if len(password) > 255:
-                return ValueError("Too long password.\nUnsuccessful registration.")
-            self.attempt_registration(username, password)
-            print(f"Successfully registered with uuid: {self.client_id}")
+            password = input("Please retype your password: ")
+            # write into 'me.info' file the user information
+            with open(CLIENT_FILE, 'w+') as client_file:
+                client_file.writelines([username + "\n", uuid])
+            return self.validate_existing_user(uuid, username, password)
         except Exception as e:
-            print(f"Caught Exception: {str(e)}")
+            print(f"login error! " + str(e))
 
 
     def validate_existing_user(self, client_id: str, username: str, password: str):
@@ -209,6 +225,7 @@ class KerberosClient:
         :param client_id: stored client id
         :param username: stored username
         :param password: new input password
+        :return: ValueError if raised
         """
         payload = {
             "name": username,
@@ -231,7 +248,7 @@ class KerberosClient:
             if "error" in response_data["payload"].lower() or response_data["code"] == 1601:
                 return ValueError("Server error: " + response_data["payload"])
             self.create_sha256(password)
-            print("Successfull registration")
+            print("Successful login")
         except json.JSONDecodeError:
             print("Not valid server response")
         except ValueError as e:
@@ -420,27 +437,31 @@ class KerberosClient:
 
 def main():
     client = KerberosClient()
-
-    response = client.register()
-    attempts = 1
-    while isinstance(response, Exception):
-        print(response)
-        response = client.register()
-        attempts += 1
-    if attempts > MAX_ATTEMPTS:
-        exit(1)
-
-    client.receive_aes_key()
-    client.send_aes_key()
     try:
+        name = input("Enter username: ")
+        clients = load_clients()
+        names = [client["name"] for client in clients]
+        if name in names:
+            response = client.login(name)
+            attempts = 1
+            while isinstance(response, Exception):
+                print(response)
+                response = client.login(name)
+                attempts += 1
+            if attempts > MAX_ATTEMPTS:
+                exit(1)
+        else:
+            client.register(name)
+
+        client.receive_aes_key()
+        client.send_aes_key()
+
         while True:
             message = input("What to send to server? ")
             client.send_message_for_print(message)
     except KeyboardInterrupt:
-        
-        print("\nThanks for playing!")
+        print(f"\n'{name}' disconnected")
 
 
-# Todo: support for multiple clients
 if __name__ == "__main__":
     main()
