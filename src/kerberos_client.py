@@ -5,7 +5,6 @@ import struct
 from shared_server import *
 import socket
 
-CLIENT_FILE = f"{FOLDER_NAME}/me.info"
 SERVERS_FILE = f"{FOLDER_NAME}/srv.info"
 ERROR_MESSAGE = "Server responded with an error."
 SERVER_ID = "64f3f63985f04beb81a0e43321880182"
@@ -36,21 +35,6 @@ def read_servers_info():
     except Exception as e:
         print(str(e))
         exit(1)
-
-
-def get_client_info():
-    """
-    :return: load current client from file
-    """
-    try:
-        with open(CLIENT_FILE, 'r') as client_file:
-            data = client_file.readlines()
-            return {"username": data[0].strip(), "uuid": data[1].strip()}
-    except FileNotFoundError as e:
-        print(str(e))
-        return e
-    except IndexError as e:
-        return e
 
 
 def get_uid_by_name(name):
@@ -211,9 +195,6 @@ class KerberosClient:
             else:
                 print(f"Welcome back user: {username}, uuid: {uuid}")
             password = input("Please retype your password: ")
-            # write into 'me.info' file the user information
-            with open(CLIENT_FILE, 'w+') as client_file:
-                client_file.writelines([username + "\n", uuid])
             return self.validate_existing_user(uuid, username, password)
         except Exception as e:
             print(f"login error! " + str(e))
@@ -264,7 +245,7 @@ class KerberosClient:
         :param username: new username
         :param password:
         :return:
-        """
+        """     
         payload = {
             "name": username,
             "password": password
@@ -289,8 +270,14 @@ class KerberosClient:
                 raise ValueError("Server error, invalid client id")
             self.create_sha256(password)
             self.__client_id__(response_data["payload"])
+
+            # write the user's information into 'me.info' file
+            client_path = os.path.join(FOLDER_NAME, username)    
+            os.makedirs(client_path, exist_ok=True)
+            CLIENT_FILE = os.path.join(client_path, "me.info")   
             with open(CLIENT_FILE, 'w') as client_file:
                 client_file.writelines([username + "\n", self.client_id])
+                
         except json.JSONDecodeError:
             print("Not valid server response")
         except ValueError as e:

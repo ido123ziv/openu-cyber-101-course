@@ -1,4 +1,3 @@
-import json
 import os
 
 from Crypto.Hash import SHA256
