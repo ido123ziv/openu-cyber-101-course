@@ -336,7 +336,6 @@ def add_client_to_file(clients):
     try:
         with open(CLIENT_FILE, 'w+') as clients_file:
             for client in clients:
-                # clients_file.write(client + "\n")
                 clients_file.write("clientID: " + client.get("clientID"))
                 clients_file.write(" Name: " + client.get("name"))
                 clients_file.write(" PasswordHash: " + client.get("passwordHash"))
@@ -344,9 +343,12 @@ def add_client_to_file(clients):
     except Exception as e:
         print("add_clients_to_file error: \n" + str(e))
         print("Couldn't add client, defaulting to previous state")
-        with open(CLIENT_FILE, 'w') as clients_file:
-            if backup_client is not None or backup_client != []:
-                clients_file.writelines(backup_client)
+        try:
+            with open(CLIENT_FILE, 'w') as clients_file:
+                if backup_client is not None or backup_client != []:
+                    clients_file.writelines(backup_client)
+        except OSError as e:
+            print(str(e))
 
 
 def main():

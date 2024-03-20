@@ -7,10 +7,11 @@ from Crypto.Random import get_random_bytes
 from base64 import b64encode, b64decode
 
 
-FOLDER_NAME=os.path.dirname(os.path.abspath(__file__))
+FOLDER_NAME = os.path.dirname(os.path.abspath(__file__))
 PORT_FILE = f"{FOLDER_NAME}/port.info"
 MESSAGE_SERVER_FILE = f"{FOLDER_NAME}/msg.info"
 CLIENT_FILE = f"{FOLDER_NAME}/clients.info"
+ERROR_MESSAGE = "Server responded with an error."
 PROTOCOL_VERSION = 24
 SERVER_RESPONSES = {
     "1600": "Succeeded registration",
@@ -22,8 +23,6 @@ SERVER_RESPONSES = {
 }
 
 
-# get_message_server_details. defaults to read but can write to it
-# TODO add options to write to this file, create a new one maybe
 def get_message_server(write=False):
     """
     :return: the message server.
@@ -55,7 +54,6 @@ def get_version():
 
 
 def load_clients():
-    # TODO: make it better than addressing the locations hard coded
     """
     Loads clients from file
     :return: a list of give clients
@@ -78,11 +76,8 @@ def load_clients():
                     "passwordHash": client[5],
                     "lastSeen": client[7] + " " + client[8].strip()
                 })
-            # print(clients)
             return clients
-    except Exception as e:
-        # print("load_clients error: \n" + str(e))
-        # print("No clients found")
+    except Exception:
         return []
 
 
@@ -166,7 +161,6 @@ def get_port():
     """
     try:
         with open(PORT_FILE, 'r') as portfile:
-            # TODO: cast to int
             port = portfile.readline().strip()
             if port:
                 return port

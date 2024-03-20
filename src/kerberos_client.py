@@ -6,7 +6,6 @@ from shared_server import *
 import socket
 
 SERVERS_FILE = f"{FOLDER_NAME}/srv.info"
-ERROR_MESSAGE = "Server responded with an error."
 SERVER_ID = "64f3f63985f04beb81a0e43321880182"
 MAX_ATTEMPTS = 5
 
@@ -19,7 +18,6 @@ def read_servers_info():
     try:
         with open(SERVERS_FILE, 'r') as servers_file:
             servers_details = servers_file.readlines()
-            # TODO: add checks for validation
             auth_details = servers_details[0].split(':')
             msg_details = servers_details[1].split(':')
             return {
@@ -37,17 +35,6 @@ def read_servers_info():
         exit(1)
 
 
-def get_uid_by_name(name):
-    """
-    :return: client's uuid by name.
-    """
-    try:
-        clients = load_clients()
-    except LookupError:
-        return []
-    return [client["clientID"] for client in clients if client["name"] == name]
-
-
 class KerberosClient:
     """
     This class represents a client used by the kerberos protocol.
@@ -63,46 +50,6 @@ class KerberosClient:
         self._aes_key = None
         self._ticket = None
         self._sha256 = None
-
-    def send_message_to_server(self, message: dict, server="auth"):
-        """
-        This method uses the socket interface to interact with the servers, auth server and message server
-        :param message: dict representing the request to server according to the accepted format.
-        :param server: server kind -> default is auth. for message pass server="msg"
-        :return: server's response
-        """
-
-        if server != "auth":
-            server_ip = self._msg_server.get("ip")
-            server_port = self._msg_server.get("port")
-        else:
-            server_ip = self._auth_server.get("ip")
-            server_port = self._auth_server.get("port")
-        try:
-
-            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.connect((server_ip, server_port))
-        except socket.error as e:
-            print("Socket error -> " + str(e))
-            exit(1)
-        try:
-            header_data = struct.pack('<16sBH I',  str.encode(message["header"]["clientID"]), message["header"]["version"], message["header"]["code"], message["header"]["payloadSize"])
-
-            client.send(header_data + message["payload"].encode("utf-8"))
-            response = client.recv(1024)
-            response = response.decode("utf-8")
-            if not response or response is None:
-                raise ValueError("Server response is empty")
-            return response
-        except KeyError as e:
-            print(f"Wrong input of key - {e}")
-            return {}
-        except Exception as e:
-            print(f"Error: {e}")
-            return e
-        finally:
-            client.close()
-
 
     @property
     def client_id(self):
@@ -156,6 +103,57 @@ class KerberosClient:
         return self._sha256
 
 
+    def get_uid_by_name(self, name):
+        """
+        :return: client's uuid by name.
+        """
+        try:
+            clients = load_clients()
+            return [client["clientID"] for client in clients if client["name"] == name]
+        except Exception:
+            return []
+
+
+    def send_message_to_server(self, message: dict, server="auth"):
+        """
+        This method uses the socket interface to interact with the servers, auth server and message server
+        :param message: dict representing the request to server according to the accepted format.
+        :param server: server kind -> default is auth. for message pass server="msg"
+        :return: server's response
+        """
+
+        if server != "auth":
+            server_ip = self._msg_server.get("ip")
+            server_port = self._msg_server.get("port")
+        else:
+            server_ip = self._auth_server.get("ip")
+            server_port = self._auth_server.get("port")
+        try:
+
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.connect((server_ip, server_port))
+        except socket.error as e:
+            print("Socket error -> " + str(e))
+            exit(1)
+        try:
+            header_data = struct.pack('<16sBH I',  str.encode(message["header"]["clientID"]), message["header"]["version"], message["header"]["code"], message["header"]["payloadSize"])
+
+            client.send(header_data + message["payload"].encode("utf-8"))
+            response = client.recv(1024)
+            response = response.decode("utf-8")
+            if not response or response is None:
+                raise ValueError("Server response is empty")
+            return response
+        except KeyError as e:
+            print(f"Wrong input of key - {e}")
+            return {}
+        except Exception as e:
+            print(f"Error: {e}")
+            return e
+        finally:
+            client.close()
+
+
     def create_sha256(self, password):
         """
         :param password: client password
@@ -188,7 +186,7 @@ class KerberosClient:
             if self._login_count == MAX_ATTEMPTS:
                 raise ValueError("Max attempts exceeded!")
             self._login_count += 1
-            uuid = get_uid_by_name(username)[0]
+            uuid = self.get_uid_by_name(username)[0]
             self.__client_id__(uuid)
             if self._login_count > 1:
                 print(f"{MAX_ATTEMPTS - self._login_count + 1} attempts left")

@@ -71,7 +71,6 @@ def test_re_register_user(server):
 
 def test_unregistered_user(server):
     """
-    test for auth server that checks? #TODO: complete
     :param server: auth server.
     """
     payload = {
@@ -91,7 +90,6 @@ def test_unregistered_user(server):
     send_to_server(server, client_request, 1601)
 
 
-# TODO: fix why not raising errors
 def test_incorrect_password(server):
     """
     test for auth server that checks registration attempt with wrong password.
@@ -121,7 +119,6 @@ def test_incorrect_password(server):
             raise ValueError("didn't find users")
 
 
-# TODO: check purpose
 def register_multiple_users(server):
     """
     

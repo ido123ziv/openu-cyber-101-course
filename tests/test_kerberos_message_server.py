@@ -6,6 +6,26 @@ import os
 os.chdir("../src")
 
 
+def get_message_servers(write=False):
+    msg_srv = {}
+    flag = 'r'
+    if write:
+        flag = 'r+'
+    try:
+        with open(MESSAGE_SERVER_FILE, flag) as msg_srv_file:
+            message_server = msg_srv_file.readlines()
+            msg_srv["ip"] = message_server[0].split(':')[0]
+            msg_srv["port"] = message_server[0].split(':')[1].strip()
+            msg_srv["name"] = message_server[1].strip()
+            msg_srv["uuid"] = message_server[2].strip()
+            msg_srv["key"] = message_server[3].strip()
+            return msg_srv
+    except Exception as e:
+        print(str(e))
+        print("Can't open message server details")
+        return default_msg_server()
+    
+    
 @pytest.fixture
 def server():
     return KerberosMessageServer()
@@ -26,5 +46,3 @@ def test_port(server, messages):
 
 def test_uuid(server, messages):
     assert messages.get("uuid") == server.uuid
-
-# Todo: Add checks if ports match as test

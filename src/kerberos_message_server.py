@@ -13,7 +13,7 @@ def default_error():
     """
     :return: default error code
     """
-    print("server responded with an error")
+    print(ERROR_MESSAGE)
     return 1609
 
 
@@ -121,7 +121,6 @@ class KerberosMessageServer:
             ticket_expiration_time = decrypt_ng(self.key, ticket["expiration_time"]).decode("utf-8")
             ticket_expiration_timef = datetime.strptime(ticket_expiration_time,'%Y-%m-%d %H:%M:%S')
             client_id = ticket.get("client_id")
-            # TODO compare client id if ticket to authenticator
             decrypted_authenticator={}
             for k,v in authenticator.items():
                 if "iv" not in k.lower():
@@ -160,7 +159,6 @@ class KerberosMessageServer:
         try:
             if len(request["messageContent"]) != request["messageSize"]:
                 raise ValueError("Invalid Message, doesn't match size")
-            # TODO: check if message size matches the payload
             message = request["messageContent"]
             if client_id not in self._clients.keys():
                 raise ValueError("Unregistered User")
@@ -244,7 +242,6 @@ class KerberosMessageServer:
         infinite loop, listening to requests from clients
         :return:
         """
-        # TODO: add methods to check this
         try:
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # bind the socket to the host and port
